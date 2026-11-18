@@ -11,6 +11,6 @@
    No secrets belong here — this file is public.
    ========================================================================== */
 window.ATTENDER_CONFIG = {
-  apiBase: 'https://attendease.freepage.cc/api/index.php',
-  apiExtraQuery: 'i=1'
+  apiBase: '',
+  apiExtraQuery: ''
 };
