@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="">
+  <title>Create lecturer account — ATTENDER</title>
+  <link rel="icon" href="../assets/img/logo.svg">
+  <link rel="stylesheet" href="../assets/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="../assets/vendor/icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../assets/css/attender.css">
+</head>
+<body>
+<div class="auth-wrap">
+  <aside class="auth-aside">
+    <a href="../index.html" class="d-flex align-items-center gap-2 text-white"><img src="../assets/img/logo.svg" width="38" alt=""><b style="letter-spacing:.07em;font-size:1.2rem">ATTENDER</b></a>
+    <div>
+      <h1>Set up your classroom in minutes.</h1>
+      <div class="point"><i class="bi bi-1-circle"></i><span>Create a class and course.</span></div>
+      <div class="point"><i class="bi bi-2-circle"></i><span>Share one invite link with your students.</span></div>
+      <div class="point"><i class="bi bi-3-circle"></i><span>Approve registrations and open attendance.</span></div>
+    </div>
+    <small style="color:#7e92ab">Your data is private to you. Other lecturers can never see your students.</small>
+  </aside>
+  <main class="auth-main">
+    <div class="auth-box" style="max-width:500px">
+      <div class="mb-4"><h2 class="mb-1">Create your account</h2><p class="text-muted">For lecturers. Students join through your invitation link.</p></div>
+      <form id="f" novalidate>
+        <div class="row g-3">
+          <div class="col-12"><label class="form-label" for="name">Full name</label><input class="form-control" id="name" placeholder="Dr. Ama Mensah" required></div>
+          <div class="col-sm-6"><label class="form-label" for="email">Work email</label><input class="form-control" id="email" type="email" placeholder="you@university.edu" required></div>
+          <div class="col-sm-6"><label class="form-label" for="phone">Phone</label><input class="form-control" id="phone" type="tel" placeholder="+233 …"></div>
+          <div class="col-sm-6"><label class="form-label" for="inst">Institution</label><input class="form-control" id="inst" placeholder="University of Cape Coast" required></div>
+          <div class="col-sm-6"><label class="form-label" for="dept">Department</label><input class="form-control" id="dept" placeholder="Computer Science"></div>
+          <div class="col-12"><label class="form-label" for="pw">Password</label><input class="form-control" id="pw" type="password" autocomplete="new-password" required>
+            <div class="progress slim mt-2"><div class="progress-bar" id="meter" style="width:0"></div></div><div class="form-text" id="mtxt">Use 8+ characters with letters, numbers and a symbol.</div></div>
+          <div class="col-12"><label class="form-label" for="pw2">Confirm password</label><input class="form-control" id="pw2" type="password" autocomplete="new-password" required></div>
+          <div class="col-12"><div class="form-check"><input class="form-check-input" type="checkbox" id="terms" required><label class="form-check-label small" for="terms">I will only collect student data, including face templates, with their consent and for attendance purposes.</label></div></div>
+        </div>
+        <div class="alert alert-danger py-2 mt-3 d-none" id="err"></div>
+        <button class="btn btn-primary w-100 btn-lg mt-3" type="submit">Create account</button>
+      </form>
+      <p class="text-center text-muted mt-4">Already registered? <a href="login.html" class="fw-600">Sign in</a></p>
+    </div>
+  </main>
+</div>
+<script src="../assets/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+<script src="../assets/js/config.js"></script><script src="../assets/js/api.js"></script><script src="../assets/js/core.js"></script>
+<script>
+  function score(p) { let s = 0; if (p.length >= 8) s++; if (p.length >= 12) s++; if (/[a-z]/.test(p) && /[A-Z]/.test(p)) s++; if (/\d/.test(p)) s++; if (/[^A-Za-z0-9]/.test(p)) s++; return Math.min(s, 4); }
+  AT.$('#pw').addEventListener('input', function () {
+    const s = score(this.value), m = AT.$('#meter'); const cols = ['#d93a3a', '#d93a3a', '#d98a00', '#12a150', '#12a150']; const txt = ['Too weak', 'Weak', 'Fair', 'Good', 'Strong'];
+    m.style.width = (this.value ? (s + 1) * 20 : 0) + '%'; m.style.background = cols[s]; AT.$('#mtxt').textContent = this.value ? txt[s] : 'Use 8+ characters with letters, numbers and a symbol.';
+  });
+  AT.$('#f').addEventListener('submit', function (e) {
+    e.preventDefault(); const err = AT.$('#err'); const v = function (id) { return AT.$('#' + id).value.trim(); };
+    let msg = '';
+    if (!v('name') || !v('inst')) msg = 'Please fill in your name and institution.';
+    else if (!/^\S+@\S+\.\S+$/.test(v('email'))) msg = 'Enter a valid email address.';
+    else if (AT.$('#pw').value.length < 8 || score(AT.$('#pw').value) < 2) msg = 'Choose a stronger password (8+ characters).';
+    else if (AT.$('#pw').value !== AT.$('#pw2').value) msg = 'The passwords do not match.';
+    else if (!AT.$('#terms').checked) msg = 'Please accept the data-use statement.';
+    if (msg) { err.textContent = msg; err.classList.remove('d-none'); return; }
+    err.classList.add('d-none');
+    const btn = e.target.querySelector('[type=submit]'); btn.disabled = true;
+    AT.api.register({
+      name: v('name'), email: v('email'), phone: v('phone'),
+      institution: v('inst'), department: v('dept'), password: AT.$('#pw').value, title: 'Lecturer'
+    }).then(function () {
+      AT.toast('Account created. Redirecting…');
+      setTimeout(function () { location.href = '../lecturer/dashboard.html'; }, 500);
+    }).catch(function (ex) {
+      err.textContent = (ex && ex.message) || 'Registration failed.';
+      err.classList.remove('d-none');
+      btn.disabled = false;
+    });
+  });
+</script>
+</body>
+</html>

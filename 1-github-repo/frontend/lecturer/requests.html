@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="">
+<title>Registration Requests — ATTENDER</title>
+<link rel="icon" href="../assets/img/logo.svg">
+<link rel="stylesheet" href="../assets/vendor/bootstrap/bootstrap.min.css">
+<link rel="stylesheet" href="../assets/vendor/icons/bootstrap-icons.min.css">
+<link rel="stylesheet" href="../assets/css/attender.css">
+</head>
+<body>
+<div id="app-root">
+<div class="page-head"><div><h2>Registration requests</h2><p>Review each student’s details and face registration before approving.</p></div></div>
+<div class="row g-3" id="list"></div>
+</div>
+<script src="../assets/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+<script src="../assets/vendor/chartjs/chart.umd.js"></script>
+<script src="../assets/vendor/qrcode/qrcode.min.js"></script>
+<script src="../assets/js/config.js"></script><script src="../assets/js/api.js"></script>
+<script src="../assets/js/core.js"></script>
+<script>
+AT.shell({ title: "Registration Requests", active: "requests", crumb: "Academics" });
+function draw() { AT.api.requests().then(function (rs) {
+  AT.$('#list').innerHTML = rs.length ? rs.map(function (s) { return '<div class="col-md-6 col-xl-4"><div class="at-card h-100"><div class="at-card-body">' +
+    '<div class="d-flex gap-3 align-items-center mb-3"><div class="position-relative">' + AT.avatar(s.name, 56) + '<span class="position-absolute bottom-0 end-0 bg-success text-white rounded-circle d-grid" style="width:20px;height:20px;place-items:center;font-size:.7rem;border:2px solid #fff" title="Face registered"><i class="bi bi-person-check-fill"></i></span></div><div><h6 class="mb-0">' + AT.esc(s.name) + '</h6><div class="mono small text-muted">' + AT.esc(s.index) + '</div></div></div>' +
+    '<dl class="row small mb-3"><dt class="col-4 text-muted fw-normal">Class</dt><dd class="col-8 mb-1">' + AT.esc(s.class.name) + '</dd><dt class="col-4 text-muted fw-normal">Email</dt><dd class="col-8 mb-1 text-break">' + AT.esc(s.email) + '</dd><dt class="col-4 text-muted fw-normal">Phone</dt><dd class="col-8 mb-1">' + AT.esc(s.phone) + '</dd><dt class="col-4 text-muted fw-normal">Submitted</dt><dd class="col-8 mb-0">' + AT.fmtDate(s.registeredAt) + '</dd></dl>' +
+    '<div class="d-flex gap-2"><button class="btn btn-primary flex-fill" data-a="approved" data-id="' + s.id + '"><i class="bi bi-check2 me-1"></i>Approve</button><button class="btn btn-ghost text-danger flex-fill" data-a="rejected" data-id="' + s.id + '"><i class="bi bi-x-lg me-1"></i>Reject</button></div></div></div></div>'; }).join('') :
+    '<div class="col-12"><div class="at-card">' + AT.empty('check2-all', 'No pending requests', 'New registrations appear here when students use your invitation link.') + '</div></div>';
+  const b = AT.$('#nav-pending'); if (b) { b.textContent = rs.length; b.classList.toggle('d-none', !rs.length); } }); }
+document.addEventListener('click', function (e) { const b = e.target.closest('[data-a]'); if (!b) return; const ap = b.dataset.a === 'approved';
+  AT.confirm({ title: ap ? 'Approve this student?' : 'Reject this registration?', text: ap ? 'They become eligible to be enrolled in your courses.' : 'The student will be told their registration was not approved.', danger: !ap, ok: ap ? 'Approve' : 'Reject', reason: !ap, icon: ap ? 'person-check' : 'person-x' }).then(function (r) {
+    if (!r) return; AT.api.decideRequest(b.dataset.id, b.dataset.a, r.reason).then(function () { AT.toast(ap ? 'Student approved' : 'Registration rejected', ap ? 'success' : 'info'); draw(); }); }); });
+draw();
+</script>
+</body>
+</html>

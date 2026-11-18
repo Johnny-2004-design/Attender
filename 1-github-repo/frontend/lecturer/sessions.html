@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="">
+<title>Attendance Sessions — ATTENDER</title>
+<link rel="icon" href="../assets/img/logo.svg">
+<link rel="stylesheet" href="../assets/vendor/bootstrap/bootstrap.min.css">
+<link rel="stylesheet" href="../assets/vendor/icons/bootstrap-icons.min.css">
+<link rel="stylesheet" href="../assets/css/attender.css">
+</head>
+<body>
+<div id="app-root">
+<div class="page-head"><div><h2>Attendance sessions</h2><p>Every session belongs to one class, one course and one lecture.</p></div><a href="attendance-live.html" class="btn btn-primary"><i class="bi bi-broadcast me-2"></i>Open attendance</a></div>
+<div class="row g-3 mb-3" id="sum"></div>
+<div class="at-card"><div class="at-card-header flex-wrap"><select class="form-select" id="fc" style="max-width:260px"></select><select class="form-select" id="fm" style="max-width:180px"><option value="">All methods</option><option value="qr">QR code</option><option value="code">One-time code</option></select></div>
+<div class="table-responsive" id="tbl"></div></div>
+</div>
+<script src="../assets/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+<script src="../assets/vendor/chartjs/chart.umd.js"></script>
+<script src="../assets/vendor/qrcode/qrcode.min.js"></script>
+<script src="../assets/js/config.js"></script><script src="../assets/js/api.js"></script>
+<script src="../assets/js/core.js"></script>
+<script>
+AT.shell({ title: "Attendance Sessions", active: "sessions", crumb: "Attendance" });
+let all = [];
+function draw() { const fc = AT.$('#fc').value, fm = AT.$('#fm').value; const rows = all.filter(function (s) { return (!fc || String(s.courseId) === fc) && (!fm || s.method === fm); });
+  AT.$('#tbl').innerHTML = rows.length ? '<table class="at-table"><thead><tr><th>Course</th><th>Class</th><th>Date</th><th>Method</th><th>Radius</th><th>Present</th><th>Late</th><th>Absent</th><th>Status</th><th></th></tr></thead><tbody>' + rows.map(function (s) {
+    return '<tr><td><div class="fw-600">' + AT.esc(s.course.code) + '</div><div class="small text-muted">' + AT.esc(s.course.title) + '</div></td><td class="small">' + AT.esc(s.class.name) + '</td><td>' + AT.fmtDate(s.date) + '<div class="small text-muted">' + AT.fmtTime(s.start) + ' – ' + AT.fmtTime(s.end) + '</div></td><td><i class="bi bi-' + (s.method === 'qr' ? 'qr-code' : 'keyboard') + ' me-1"></i>' + (s.method === 'qr' ? 'QR' : 'Code') + '</td><td>' + s.radius + ' m</td><td>' + s.stats.present + '</td><td>' + s.stats.late + '</td><td>' + s.stats.absent + '</td><td>' + AT.badge(s.status) + '</td><td class="text-end"><a class="btn btn-sm btn-soft" href="records.html?session=' + s.id + '">Records</a></td></tr>'; }).join('') + '</tbody></table>' : AT.empty('calendar2-x', 'No sessions match', 'Try different filters.'); }
+Promise.all([AT.api.sessions(), AT.api.courses()]).then(function (r) { all = r[0]; AT.$('#fc').innerHTML = '<option value="">All courses</option>' + r[1].map(function (c) { return '<option value="' + c.id + '">' + AT.esc(c.code + ' — ' + c.title) + '</option>'; }).join('');
+  const avg = all.length ? Math.round(all.reduce(function (a, s) { return a + s.stats.rate; }, 0) / all.length) : 0;
+  AT.$('#sum').innerHTML = [['calendar2-check-fill', 'blue', all.length, 'Total sessions'], ['graph-up-arrow', 'green', avg + '%', 'Average rate'], ['qr-code', 'dark', all.filter(function (s) { return s.method === 'qr'; }).length, 'QR sessions'], ['keyboard', 'amber', all.filter(function (s) { return s.method === 'code'; }).length, 'Code sessions']].map(function (x) { return '<div class="col-6 col-lg-3"><div class="at-card stat-card"><div class="stat-icon ' + x[1] + '"><i class="bi bi-' + x[0] + '"></i></div><div><div class="stat-value">' + x[2] + '</div><div class="stat-label">' + x[3] + '</div></div></div></div>'; }).join(''); draw(); });
+AT.$('#fc').onchange = draw; AT.$('#fm').onchange = draw;
+</script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "name": "attender/attender",
+  "description": "ATTENDER — Smart Attendance, Verified Presence",
+  "type": "project",
+  "require": {
+    "php": ">=8.1",
+    "ext-json": "*",
+    "ext-pdo": "*",
+    "ext-mbstring": "*",
+    "phpoffice/phpspreadsheet": "^2.2",
+    "dompdf/dompdf": "^3.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "Attender\\": "src/"
+    },
+    "files": [
+      "src/Support/helpers.php"
+    ]
+  },
+  "config": {
+    "optimize-autoloader": true,
+    "sort-packages": true
+  }
+}

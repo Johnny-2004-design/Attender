@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="">
+<title>Dashboard — ATTENDER</title>
+<link rel="icon" href="../assets/img/logo.svg">
+<link rel="stylesheet" href="../assets/vendor/bootstrap/bootstrap.min.css">
+<link rel="stylesheet" href="../assets/vendor/icons/bootstrap-icons.min.css">
+<link rel="stylesheet" href="../assets/css/attender.css">
+</head>
+<body>
+<div id="app-root">
+<div class="page-head">
+  <div><h2 id="hello">Welcome</h2><p>Here is what is happening across your classes.</p></div>
+  <div class="d-flex flex-wrap gap-2">
+    <a href="attendance-live.html" class="btn btn-primary"><i class="bi bi-broadcast me-2"></i>Open attendance</a>
+    <a href="courses.html?new=1" class="btn btn-ghost bg-white"><i class="bi bi-journal-plus me-2"></i>Create course</a>
+    <a href="classes.html?invite=1" class="btn btn-ghost bg-white"><i class="bi bi-link-45deg me-2"></i>Invite students</a>
+  </div>
+</div>
+<div id="active-banner"></div>
+<div class="row g-3 mb-4" id="stats">
+  <div class="col-6 col-xl"><div class="at-card stat-card"><div class="skeleton" style="width:100%;height:46px"></div></div></div>
+  <div class="col-6 col-xl"><div class="at-card stat-card"><div class="skeleton" style="width:100%;height:46px"></div></div></div>
+  <div class="col-6 col-xl"><div class="at-card stat-card"><div class="skeleton" style="width:100%;height:46px"></div></div></div>
+  <div class="col-6 col-xl"><div class="at-card stat-card"><div class="skeleton" style="width:100%;height:46px"></div></div></div>
+  <div class="col-12 col-xl"><div class="at-card stat-card"><div class="skeleton" style="width:100%;height:46px"></div></div></div>
+</div>
+<div class="row g-3 mb-3">
+  <div class="col-lg-8"><div class="at-card h-100"><div class="at-card-header"><h5>Attendance trend</h5><span class="text-muted small">Rate per closed session</span></div><div class="at-card-body"><div style="height:260px"><canvas id="trend"></canvas></div></div></div></div>
+  <div class="col-lg-4"><div class="at-card h-100"><div class="at-card-header"><h5>By course</h5><span class="text-muted small">Average rate</span></div><div class="at-card-body"><div style="height:260px"><canvas id="bycourse"></canvas></div></div></div></div>
+</div>
+<div class="row g-3">
+  <div class="col-xl-7"><div class="at-card h-100"><div class="at-card-header"><h5>Recent attendance sessions</h5><a href="sessions.html" class="small fw-600">View all</a></div><div class="table-responsive" id="recent"></div></div></div>
+  <div class="col-xl-5">
+    <div class="at-card mb-3"><div class="at-card-header"><h5>Pending registrations</h5><a href="requests.html" class="small fw-600">Review</a></div><div id="pending"></div></div>
+    <div class="at-card"><div class="at-card-header"><h5>Recently registered</h5></div><div id="newstu"></div></div>
+  </div>
+</div>
+</div>
+<script src="../assets/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+<script src="../assets/vendor/chartjs/chart.umd.js"></script>
+<script src="../assets/vendor/qrcode/qrcode.min.js"></script>
+<script src="../assets/js/config.js"></script><script src="../assets/js/api.js"></script>
+<script src="../assets/js/core.js"></script>
+<script>
+AT.shell({ title: "Dashboard", active: "dashboard", crumb: "Overview" });
+function stat(icon, color, value, label) { return '<div class="col-6 col-xl"><div class="at-card stat-card"><div class="stat-icon ' + color + '"><i class="bi bi-' + icon + '"></i></div><div><div class="stat-value">' + value + '</div><div class="stat-label">' + label + '</div></div></div></div>'; }
+AT.api.me().then(function (m) { const h = new Date().getHours(); AT.$('#hello').textContent = (h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening') + ', ' + m.name.replace(/^Dr\.\s*/, 'Dr. ').split(' ').slice(0, 2).join(' '); });
+AT.api.dashboard().then(function (d) {
+  const t = d.totals;
+  AT.$('#stats').innerHTML = stat('people-fill', 'blue', t.students, 'Total students') + stat('mortarboard-fill', 'dark', t.classes, 'Total classes') + stat('journal-bookmark-fill', 'amber', t.courses, 'Total courses') + stat('calendar2-check-fill', 'green', t.sessions, 'Attendance sessions') +
+    '<div class="col-12 col-xl"><div class="at-card stat-card"><div class="stat-icon ' + (t.avgRate >= 75 ? 'green' : 'amber') + '"><i class="bi bi-graph-up-arrow"></i></div><div class="flex-grow-1"><div class="stat-value">' + t.avgRate + '%</div><div class="stat-label">Average attendance rate</div></div></div></div>';
+  if (d.active) AT.$('#active-banner').innerHTML = '<a href="attendance-live.html" class="at-card at-card-body d-flex align-items-center gap-3 mb-3 text-dark" style="border-color:#9fd1b3;background:#effaf3"><span class="live-dot"></span><div class="flex-grow-1"><b>An attendance session is live</b><div class="small text-muted">Return to the classroom screen</div></div><i class="bi bi-arrow-right"></i></a>';
+  AT.$('#recent').innerHTML = d.recentSessions.length ? '<table class="at-table"><thead><tr><th>Course</th><th>Date</th><th>Present</th><th style="width:160px">Rate</th></tr></thead><tbody>' + d.recentSessions.map(function (s) {
+    return '<tr><td><div class="fw-600">' + AT.esc(s.course.code) + '</div><div class="small text-muted">' + AT.esc(s.course.title) + '</div></td><td>' + AT.fmtDate(s.date) + '</td><td>' + (s.stats.present + s.stats.late) + ' / ' + s.stats.total + '</td><td>' + AT.rateBar(s.stats.rate) + '</td></tr>'; }).join('') + '</tbody></table>' : AT.empty('calendar2-x', 'No sessions yet', 'Open your first attendance session.');
+  AT.$('#pending').innerHTML = d.pending.length ? d.pending.map(function (s) { return '<div class="feed-item">' + AT.avatar(s.name) + '<div class="flex-grow-1"><div class="fw-600">' + AT.esc(s.name) + '</div><div class="small text-muted">' + AT.esc(s.index) + '</div></div>' + AT.badge('pending') + '</div>'; }).join('') + (d.pendingCount > d.pending.length ? '<div class="p-2 text-center small text-muted">+ ' + (d.pendingCount - d.pending.length) + ' more</div>' : '') : AT.empty('check2-all', 'All caught up', 'No registrations waiting.');
+  AT.$('#newstu').innerHTML = d.recentStudents.map(function (s) { return '<div class="feed-item">' + AT.avatar(s.name) + '<div class="flex-grow-1"><div class="fw-600">' + AT.esc(s.name) + '</div><div class="small text-muted">' + AT.esc(s.programme) + ' · L' + s.level + '</div></div><span class="small text-muted">' + AT.fmtDate(s.registeredAt) + '</span></div>'; }).join('');
+
+  Chart.defaults.font.family = getComputedStyle(document.body).fontFamily; Chart.defaults.color = '#6b7686';
+  new Chart(AT.$('#trend'), { type: 'line', data: { labels: d.trend.map(function (x) { return AT.fmtDate(x.date).slice(0, 6); }), datasets: [{ data: d.trend.map(function (x) { return x.rate; }), borderColor: '#0A66C2', backgroundColor: 'rgba(10,102,194,.1)', fill: true, tension: .35, pointRadius: 3, pointBackgroundColor: '#0A66C2' }] },
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 100, ticks: { callback: function (v) { return v + '%'; } }, grid: { color: '#eef1f5' } }, x: { grid: { display: false } } } } });
+  new Chart(AT.$('#bycourse'), { type: 'bar', data: { labels: d.byCourse.map(function (x) { return x.code; }), datasets: [{ data: d.byCourse.map(function (x) { return x.rate; }), backgroundColor: '#0A66C2', borderRadius: 8, maxBarThickness: 34 }] },
+    options: { maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { min: 0, max: 100, grid: { color: '#eef1f5' } }, y: { grid: { display: false } } } } });
+});
+</script>
+</body>
+</html>

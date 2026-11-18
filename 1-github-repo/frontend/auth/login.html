@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="">
+  <title>Lecturer login — ATTENDER</title>
+  <link rel="icon" href="../assets/img/logo.svg">
+  <link rel="stylesheet" href="../assets/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="../assets/vendor/icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../assets/css/attender.css">
+</head>
+<body>
+<div class="auth-wrap">
+  <aside class="auth-aside">
+    <a href="../index.html" class="d-flex align-items-center gap-2 text-white"><img src="../assets/img/logo.svg" width="38" alt=""><b style="letter-spacing:.07em;font-size:1.2rem">ATTENDER</b></a>
+    <div>
+      <h1>Smart attendance, verified presence.</h1>
+      <div class="point"><i class="bi bi-qr-code-scan"></i><span>QR codes and one-time codes through one verification engine.</span></div>
+      <div class="point"><i class="bi bi-geo-alt"></i><span>Classroom GPS radius that you control.</span></div>
+      <div class="point"><i class="bi bi-person-bounding-box"></i><span>Face match with liveness checks to stop proxy attendance.</span></div>
+    </div>
+    <small style="color:#7e92ab">Students scan. Lecturers manage. ATTENDER verifies.</small>
+  </aside>
+  <main class="auth-main">
+    <div class="auth-box">
+      <div class="mb-4">
+        <img src="../assets/img/logo.svg" width="46" class="mb-3 d-lg-none" alt="">
+        <h2 class="mb-1">Welcome back</h2>
+        <p class="text-muted">Sign in to manage your classes and attendance.</p>
+      </div>
+      <div class="alert alert-danger py-2 d-none" id="err" role="alert"></div>
+      <form id="f" novalidate>
+        <div class="mb-3"><label class="form-label" for="email">Email</label>
+          <div class="input-icon"><i class="bi bi-envelope"></i><input class="form-control" id="email" type="email" autocomplete="username" placeholder="you@university.edu" required></div></div>
+        <div class="mb-3"><div class="d-flex justify-content-between"><label class="form-label" for="pw">Password</label><a href="#" class="small" id="forgot">Forgot password?</a></div>
+          <div class="input-icon"><i class="bi bi-lock"></i><input class="form-control" id="pw" type="password" autocomplete="current-password" placeholder="Your password" required>
+          <button type="button" class="btn btn-sm position-absolute top-50 end-0 translate-middle-y me-1 text-muted" id="tg" aria-label="Show password"><i class="bi bi-eye"></i></button></div></div>
+        <button class="btn btn-primary w-100 btn-lg" id="go" type="submit">Sign in</button>
+      </form>
+      <p class="text-center text-muted mt-4 mb-1">New lecturer? <a href="register.html" class="fw-600">Create an account</a></p>
+      <p class="text-center text-muted small">Student? <a href="../student/scan.html">Mark attendance</a></p>
+    </div>
+  </main>
+</div>
+<script src="../assets/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+<script src="../assets/js/config.js"></script><script src="../assets/js/api.js"></script><script src="../assets/js/core.js"></script>
+<script>
+  AT.$('#tg').onclick = function () { const p = AT.$('#pw'); const s = p.type === 'password'; p.type = s ? 'text' : 'password'; this.firstElementChild.className = 'bi bi-eye' + (s ? '-slash' : ''); };
+  AT.$('#forgot').onclick = function (e) { e.preventDefault(); AT.toast('Ask your administrator to reset your password from the database for now.', 'info'); };
+  AT.$('#f').addEventListener('submit', function (e) {
+    e.preventDefault(); const em = AT.$('#email').value.trim(), pw = AT.$('#pw').value, err = AT.$('#err');
+    if (!/^\S+@\S+\.\S+$/.test(em) || pw.length < 8) { err.textContent = 'Enter a valid email and a password of at least 8 characters.'; err.classList.remove('d-none'); return; }
+    err.classList.add('d-none'); const b = AT.$('#go'); b.disabled = true; b.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Signing in…';
+    AT.api.login(em, pw).then(function () { location.href = '../lecturer/dashboard.html'; })
+      .catch(function (ex) { err.textContent = (ex && ex.message) || 'Sign-in failed.'; err.classList.remove('d-none'); b.disabled = false; b.textContent = 'Sign in'; });
+  });
+</script>
+</body>
+</html>

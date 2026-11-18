@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="">
+<title>Take Attendance — ATTENDER</title>
+<link rel="icon" href="../assets/img/logo.svg">
+<link rel="stylesheet" href="../assets/vendor/bootstrap/bootstrap.min.css">
+<link rel="stylesheet" href="../assets/vendor/icons/bootstrap-icons.min.css">
+<link rel="stylesheet" href="../assets/css/attender.css">
+</head>
+<body>
+<div id="app-root">
+<!-- SETUP -->
+<div id="setup" class="d-none">
+  <div class="page-head"><div><h2>Open attendance</h2><p>Choose how students will check in. You can keep teaching while they scan.</p></div></div>
+  <form id="sf" class="row g-3" novalidate>
+    <div class="col-lg-8">
+      <div class="at-card mb-3"><div class="at-card-header"><h5>Lecture</h5></div><div class="at-card-body row g-3">
+        <div class="col-md-8"><label class="form-label">Course *</label><select class="form-select" id="s-course" required></select><div class="form-text" id="s-elig"></div></div>
+        <div class="col-md-4"><label class="form-label">Duration (minutes)</label><input type="number" min="5" max="240" class="form-control" id="s-dur" value="30"></div>
+        <div class="col-md-8"><label class="form-label">Classroom location</label><input class="form-control" id="s-loc" placeholder="Lecture Hall A"></div>
+        <div class="col-md-4"><label class="form-label">Late after (minutes)</label><input type="number" min="0" class="form-control" id="s-late" value="10"><div class="form-text">0 disables late status.</div></div>
+      </div></div>
+      <div class="at-card mb-3"><div class="at-card-header"><h5>Attendance method</h5></div><div class="at-card-body">
+        <div class="row g-3 mb-3">
+          <div class="col-md-6"><input type="radio" class="btn-check" name="method" id="m-qr" value="qr" checked><label class="at-card at-card-body w-100 hover d-block" for="m-qr" style="cursor:pointer"><div class="d-flex gap-3"><div class="stat-icon blue"><i class="bi bi-qr-code"></i></div><div><b>QR code</b><div class="small text-muted">Students scan from their phone. Show it on your laptop or print it.</div></div></div></label></div>
+          <div class="col-md-6"><input type="radio" class="btn-check" name="method" id="m-code" value="code"><label class="at-card at-card-body w-100 hover d-block" for="m-code" style="cursor:pointer"><div class="d-flex gap-3"><div class="stat-icon amber"><i class="bi bi-keyboard"></i></div><div><b>One-time code</b><div class="small text-muted">Write a short code on the board. No projector needed.</div></div></div></label></div>
+        </div>
+        <div id="qr-opts" class="row g-3">
+          <div class="col-md-6"><label class="form-label">QR display</label><select class="form-select" id="s-qrmode"><option value="live">Live on screen (rotating QR)</option><option value="print">Printed (fixed QR)</option></select></div>
+          <div class="col-md-6"><label class="form-label" id="qv-label">QR validity (minutes)</label><input type="number" min="1" max="240" class="form-control" id="s-qrmin" value="30"><div class="form-text" id="qv-help">Live QR codes refresh automatically.</div></div>
+          <div class="col-12 d-none" id="print-warn"><div class="alert alert-warning mb-0 small"><i class="bi bi-exclamation-triangle me-1"></i>A printed QR cannot refresh. Its security relies on the server-side session, the GPS radius, the face check and its expiry. Choose a short validity.</div></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="col-lg-4">
+      <div class="at-card mb-3"><div class="at-card-header"><h5>Verification</h5></div><div class="at-card-body">
+        <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" id="s-gps" checked><label class="form-check-label fw-600" for="s-gps">GPS location check</label></div>
+        <div id="gps-box">
+          <label class="form-label">Radius: <b id="rv">30 m</b></label>
+          <div class="d-flex gap-2 mb-2"><button type="button" class="btn btn-sm btn-ghost" data-r="20">20 m</button><button type="button" class="btn btn-sm btn-ghost" data-r="30">30 m</button><button type="button" class="btn btn-sm btn-ghost" data-r="50">50 m</button></div>
+          <input type="range" class="form-range" id="s-rad" min="10" max="200" step="5" value="30">
+          <div class="map-preview my-3"><div class="map-radius" id="mr"></div><div class="map-pin"><i class="bi bi-geo-alt-fill"></i></div></div>
+          <div class="d-flex align-items-center gap-2"><button type="button" class="btn btn-soft btn-sm" id="locate"><i class="bi bi-crosshair me-1"></i>Use my location</button><span class="small text-muted" id="lstat">Not set</span></div>
+        </div>
+        <hr><div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="s-face" checked><label class="form-check-label fw-600" for="s-face">Face + liveness check</label></div>
+        <div class="form-text" id="face-help">Required by your policy. Change it in Settings.</div>
+      </div></div>
+      <button class="btn btn-primary btn-lg w-100" type="submit"><i class="bi bi-broadcast me-2"></i>Open attendance</button>
+    </div>
+  </form>
+</div>
+
+<!-- LIVE -->
+<div id="live" class="d-none">
+  <div class="page-head">
+    <div><div class="d-flex align-items-center gap-2 mb-1"><span class="live-dot"></span><b class="text-success">Attendance open</b><span class="text-muted small" id="l-timer"></span></div>
+      <h2 id="l-course">Course</h2><p id="l-class" class="mb-0"></p></div>
+    <div class="d-flex flex-wrap gap-2">
+      <button class="btn btn-ghost bg-white" id="b-corner"><i class="bi bi-pip me-2"></i>Corner mode</button>
+      <button class="btn btn-ghost bg-white" id="b-full"><i class="bi bi-fullscreen me-2"></i>Full screen</button>
+      <button class="btn btn-danger" id="b-close"><i class="bi bi-stop-circle me-2"></i>Close attendance</button>
+    </div>
+  </div>
+  <div class="row g-3">
+    <div class="col-lg-5 col-xl-4"><div class="at-card">
+      <div class="at-card-header"><div class="btn-group btn-group-sm" role="group"><input type="radio" class="btn-check" name="lm" id="lm-qr" value="qr"><label class="btn btn-outline-primary" for="lm-qr"><i class="bi bi-qr-code me-1"></i>QR</label><input type="radio" class="btn-check" name="lm" id="lm-code" value="code"><label class="btn btn-outline-primary" for="lm-code"><i class="bi bi-keyboard me-1"></i>Code</label></div><span class="small text-muted" id="l-mode"></span></div>
+      <div class="qr-stage">
+        <div id="v-qr"><div class="qr-frame" id="qf"><canvas id="qc"></canvas></div>
+          <div class="mt-3"><div class="countdown-ring" id="ring"><div style="width:100%"></div></div><div class="small text-muted mt-1" id="qtxt"></div></div>
+          <div class="d-flex flex-wrap gap-2 justify-content-center mt-3"><button class="btn btn-soft btn-sm" id="b-regen"><i class="bi bi-arrow-repeat me-1"></i>Regenerate</button><button class="btn btn-ghost btn-sm" id="b-print"><i class="bi bi-printer me-1"></i>Print</button><button class="btn btn-ghost btn-sm" id="b-dl"><i class="bi bi-download me-1"></i>Download</button></div></div>
+        <div id="v-code" class="d-none"><div class="text-muted small mb-2">Write this on the board</div><div class="code-display mono" id="cd">------</div>
+          <div class="small text-muted mt-2" id="ctxt"></div><button class="btn btn-soft btn-sm mt-3" id="b-newcode"><i class="bi bi-arrow-repeat me-1"></i>Generate a new code</button></div>
+      </div>
+      <div class="px-3 pb-3"><div class="small text-muted mb-1">Student link</div><div class="invite-link d-flex justify-content-between gap-2"><span id="lnk" class="text-truncate"></span><a href="#" id="cplnk" class="fw-600 flex-none">Copy</a></div></div>
+    </div></div>
+
+    <div class="col-lg-7 col-xl-8">
+      <div class="row g-2 mb-3">
+        <div class="col-6 col-md-3"><div class="mini-stat" style="background:#fff;border:1px solid var(--at-line)"><b id="n-reg">0</b><span>Eligible</span></div></div>
+        <div class="col-6 col-md-3"><div class="mini-stat" style="background:var(--at-success-bg)"><b id="n-pre" class="text-success">0</b><span>Present</span></div></div>
+        <div class="col-6 col-md-3"><div class="mini-stat" style="background:var(--at-warning-bg)"><b id="n-late">0</b><span>Late</span></div></div>
+        <div class="col-6 col-md-3"><div class="mini-stat" style="background:var(--at-danger-bg)"><b id="n-abs" class="text-danger">0</b><span>Not yet</span></div></div>
+      </div>
+      <div class="at-card mb-3"><div class="at-card-body py-3 d-flex flex-wrap gap-3 align-items-center">
+        <span class="badge-soft b-active" id="s-gpsb"><i></i>GPS on</span><span class="badge-soft b-review" id="s-faceb">Face check on</span><span class="small text-muted" id="s-meta"></span>
+        <div class="ms-auto d-flex align-items-center gap-2"><span class="small text-muted">Late after</span><input type="number" min="0" class="form-control form-control-sm" id="late-in" style="width:70px"><span class="small text-muted">min</span></div>
+      </div></div>
+      <div class="row g-3">
+        <div class="col-xl-7"><div class="at-card"><div class="at-card-header"><h6>Recent check-ins</h6><button class="btn btn-sm btn-ghost" id="b-sim" title="Preview only: adds a fake arrival so you can see the screen working"><i class="bi bi-magic me-1"></i>Demo arrival</button></div><div class="feed" id="f-ok"></div></div></div>
+        <div class="col-xl-5"><div class="at-card"><div class="at-card-header"><h6>Rejected attempts</h6></div><div class="feed" id="f-bad"></div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="corner-qr" id="corner"><div class="d-flex justify-content-between align-items-center mb-1"><b class="small">Scan to check in</b><button class="btn btn-sm p-0 text-muted" id="c-x" aria-label="Close"><i class="bi bi-x-lg"></i></button></div><canvas id="cc"></canvas><div class="code mono" id="cc-code"></div></div>
+<div class="fullscreen-qr" id="fs"><button class="btn btn-ghost position-absolute top-0 end-0 m-3" id="fs-x"><i class="bi bi-x-lg me-1"></i>Exit</button><h2 id="fs-title" class="mb-3"></h2><canvas id="fc"></canvas><div class="mt-3 fs-4 text-muted">Or enter code <b class="mono text-dark" id="fs-code"></b></div></div>
+<div class="print-only"><img src="../assets/img/logo.svg" width="64" alt=""><h1 class="mt-3">Scan to mark attendance</h1><h3 id="pr-course" class="text-muted"></h3><canvas id="pc" class="my-4"></canvas><p id="pr-valid" class="fs-5"></p><p class="text-muted">ATTENDER · Smart Attendance, Verified Presence</p></div>
+</div>
+<script src="../assets/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+<script src="../assets/vendor/chartjs/chart.umd.js"></script>
+<script src="../assets/vendor/qrcode/qrcode.min.js"></script>
+<script src="../assets/js/config.js"></script><script src="../assets/js/api.js"></script>
+<script src="../assets/js/core.js"></script>
+<script>
+AT.shell({ title: "Take Attendance", active: "live", crumb: "Attendance / Live session", noQuick: true });
+let A = null, S = null, tick = null, lastRender = '';
+const qrUrl = function () { return AT.studentUrl('scan.html') + '?t=' + A.token; };
+function show(which) { AT.$('#setup').classList.toggle('d-none', which !== 'setup'); AT.$('#live').classList.toggle('d-none', which !== 'live'); }
+const radiusPx = function (m) { return Math.min(95, 20 + m * 0.45) * 2; };
+
+/* ---------- Setup ---------- */
+function setupInit() {
+  Promise.all([AT.api.courses(), AT.api.settings()]).then(function (r) { const cs = r[0]; S = r[1];
+    AT.$('#s-course').innerHTML = cs.map(function (c) { return '<option value="' + c.id + '" data-n="' + c.enrolled + '">' + AT.esc(c.code + ' — ' + c.title) + '</option>'; }).join('');
+    AT.$('#s-loc').value = S.locName || ''; AT.$('#s-rad').value = S.defaultRadius; AT.$('#s-gps').checked = S.requireGps !== false;
+    AT.$('#s-face').checked = true; AT.$('#s-face').disabled = !S.allowDisableFace; AT.$('#face-help').textContent = S.allowDisableFace ? 'Your policy allows turning this off for a session.' : 'Required by your policy. Change it in Settings.';
+    AT.$('#lstat').textContent = S.lat ? S.lat.toFixed(5) + ', ' + S.lng.toFixed(5) : 'Not set'; sync(); });
+}
+function sync() { const o = AT.$('#s-course').selectedOptions[0]; AT.$('#s-elig').textContent = o ? o.dataset.n + ' enrolled students are eligible.' : ''; const r = Number(AT.$('#s-rad').value);
+  AT.$('#rv').textContent = r + ' m'; const px = radiusPx(r); AT.$('#mr').style.width = AT.$('#mr').style.height = px + 'px'; AT.$('#gps-box').style.opacity = AT.$('#s-gps').checked ? 1 : .4;
+  const live = AT.$('#s-qrmode').value === 'live'; AT.$('#print-warn').classList.toggle('d-none', live); AT.$('#qv-label').textContent = live ? 'QR refresh (seconds)' : 'QR validity (minutes)'; AT.$('#qv-help').textContent = live ? 'Each QR is replaced after this many seconds.' : 'The printed QR stops working after this time.';
+  if (live && Number(AT.$('#s-qrmin').value) > 120) AT.$('#s-qrmin').value = 30;
+  AT.$('#qr-opts').classList.toggle('d-none', document.querySelector('[name=method]:checked').value !== 'qr'); }
+['s-course', 's-rad', 's-gps', 's-qrmode'].forEach(function (i) { AT.$('#' + i).addEventListener('input', sync); }); document.querySelectorAll('[name=method]').forEach(function (e) { e.addEventListener('change', sync); });
+AT.$('#s-qrmode').addEventListener('change', function () { AT.$('#s-qrmin').value = this.value === 'live' ? 30 : 5; sync(); });
+document.querySelectorAll('[data-r]').forEach(function (b) { b.onclick = function () { AT.$('#s-rad').value = b.dataset.r; sync(); }; });
+AT.$('#locate').onclick = function () { if (!navigator.geolocation) return AT.toast('This browser has no location support.', 'error'); AT.$('#lstat').textContent = 'Locating…';
+  navigator.geolocation.getCurrentPosition(function (p) { S.lat = p.coords.latitude; S.lng = p.coords.longitude; S.acc = p.coords.accuracy; AT.api.saveSettings({ lat: S.lat, lng: S.lng }); AT.$('#lstat').textContent = S.lat.toFixed(5) + ', ' + S.lng.toFixed(5) + ' (±' + Math.round(p.coords.accuracy) + ' m)'; AT.toast('Classroom location saved'); },
+    function (e) { AT.$('#lstat').textContent = 'Unavailable'; AT.toast(e.code === 1 ? 'Location permission denied. Allow it in your browser settings.' : 'Could not get your location.', 'error'); }, { enableHighAccuracy: true, timeout: 15000 }); };
+AT.$('#sf').onsubmit = function (e) { e.preventDefault(); const gps = AT.$('#s-gps').checked;
+  if (gps && !S.lat) return AT.toast('Set the classroom location first (Use my location).', 'error');
+  const method = document.querySelector('[name=method]:checked').value, qrMode = AT.$('#s-qrmode').value;
+  AT.api.openSession({ courseId: AT.$('#s-course').value, method: method, radius: AT.$('#s-rad').value, duration: AT.$('#s-dur').value, lateAfter: AT.$('#s-late').value, qrMode: qrMode, qrMinutes: AT.$('#s-qrmin').value, gps: gps, face: AT.$('#s-face').checked, location: AT.$('#s-loc').value.trim() || 'Classroom' })
+    .then(function (a) { AT.api.saveSettings({ locName: a.location }); A = a; AT.toast('Attendance is open'); startLive(); }); };
+
+/* ---------- Live ---------- */
+function startLive() { show('live'); const c = AT.api; Promise.all([c.courses(), c.classes()]).then(function (r) { const co = r[0].find(function (x) { return x.id === A.courseId; }); AT.$('#l-course').textContent = co.code + ' — ' + co.title; AT.$('#l-class').textContent = co.class.name + ' · ' + A.location; });
+  document.querySelector('#lm-' + A.method).checked = true; AT.$('#late-in').value = A.lateAfter; AT.$('#lnk').textContent = AT.studentUrl('scan.html');
+  AT.$('#s-gpsb').textContent = A.gps ? 'GPS ' + A.radius + ' m' : 'GPS off'; AT.$('#s-gpsb').className = 'badge-soft ' + (A.gps ? 'b-active' : 'b-closed'); AT.$('#s-faceb').textContent = A.face ? 'Face check on' : 'Face check off'; AT.$('#s-faceb').className = 'badge-soft ' + (A.face ? 'b-review' : 'b-late');
+  AT.$('#s-meta').textContent = (A.qrMode === 'print' ? 'Printed QR' : 'Live QR') + ' · ' + A.eligible + ' eligible'; modeView(); clearInterval(tick); tick = setInterval(loop, 1000); loop(true); }
+function modeView() { const q = A.method === 'qr'; AT.$('#v-qr').classList.toggle('d-none', !q); AT.$('#v-code').classList.toggle('d-none', q); AT.$('#l-mode').textContent = q ? (A.qrMode === 'print' ? 'Fixed QR' : 'Rotating QR') : 'One-time code'; AT.$('#cd').textContent = A.code; AT.$('#cc-code').textContent = A.code; AT.$('#fs-code').textContent = A.code; renderQR(true); }
+function renderQR(force) { const u = qrUrl(); if (!force && u === lastRender) return; lastRender = u; AT.drawQR(AT.$('#qc'), u, 260); AT.drawQR(AT.$('#cc'), u, 180); AT.drawQR(AT.$('#fc'), u, 640); AT.drawQR(AT.$('#pc'), u, 420); }
+function loop(first) {
+  if (!A) return; const now = Date.now(), opened = new Date(A.opened).getTime(), left = opened + A.duration * 60000 - now;
+  AT.$('#l-timer').textContent = left > 0 ? '· closes in ' + Math.floor(left / 60000) + ':' + String(Math.floor(left / 1000) % 60).padStart(2, '0') : '· time is up';
+  if (left <= 0 && !loop.warned) { loop.warned = true; AT.toast('The attendance window has ended. Close attendance to finalise.', 'info'); }
+  if (A.method === 'qr') {
+    const total = A.qrMode === 'print' ? A.qrMinutes * 60 : Math.max(5, A.qrMinutes), age = (now - (A.tokenAt || opened)) / 1000, rem = Math.max(0, Math.ceil(total - age));
+    AT.$('#ring').firstElementChild.style.width = (rem / total * 100) + '%'; AT.$('#ring').classList.toggle('low', rem <= 5);
+    AT.$('#qtxt').textContent = A.qrMode === 'print' ? (rem > 0 ? 'Printed QR valid for ' + Math.floor(rem / 60) + 'm ' + (rem % 60) + 's' : 'Printed QR expired. Regenerate to continue.') : 'Refreshes in ' + rem + 's';
+    if (rem === 0 && A.qrMode === 'live') rotate(); AT.$('#qf').classList.toggle('expired', A.qrMode === 'print' && rem === 0);
+  } else { const r = Math.max(0, Math.floor((new Date(A.codeExpires) - now) / 1000)); AT.$('#ctxt').textContent = r > 0 ? 'Expires in ' + Math.floor(r / 60) + ':' + String(r % 60).padStart(2, '0') + ' · 5 attempts per student' : 'Code expired. Generate a new one.'; }
+  if (first === true || Math.floor(now / 1000) % 3 === 0) refresh();
+}
+function rotate() { AT.api.rotateToken().then(function (a) { A = Object.assign(a, { tokenAt: Date.now() }); renderQR(); }); }
+function refresh() { AT.api.activeSession().then(function (a) { if (!a) return; A.feed = a.feed; const ok = a.feed.filter(function (f) { return f.ok; }), bad = a.feed.filter(function (f) { return !f.ok; }); const pre = ok.filter(function (f) { return f.status === 'present'; }).length, late = ok.length - pre;
+  AT.$('#n-reg').textContent = a.eligible; AT.$('#n-pre').textContent = pre; AT.$('#n-late').textContent = late; AT.$('#n-abs').textContent = Math.max(0, a.eligible - ok.length);
+  AT.$('#f-ok').innerHTML = ok.length ? ok.slice(0, 20).map(function (f) { return '<div class="feed-item">' + AT.avatar(f.name, 32) + '<div class="flex-grow-1"><div class="fw-600">' + AT.esc(f.name) + '</div><div class="small text-muted">' + f.distance + ' m · face ' + Math.round(f.similarity * 100) + '%</div></div>' + AT.badge(f.status) + '<span class="small text-muted">' + AT.fmtTime(f.time) + '</span></div>'; }).join('') : AT.empty('hourglass-split', 'Waiting for students', 'Check-ins appear here as they happen.');
+  AT.$('#f-bad').innerHTML = bad.length ? bad.slice(0, 20).map(function (f) { return '<div class="feed-item"><i class="bi bi-x-octagon-fill text-danger"></i><div class="flex-grow-1"><div class="fw-600">' + AT.esc(f.name) + '</div><div class="small text-muted">' + AT.esc(f.reason) + '</div></div><span class="small text-muted">' + AT.fmtTime(f.time) + '</span></div>'; }).join('') : AT.empty('shield-check', 'No rejected attempts', ''); }); }
+
+AT.$('#b-regen').onclick = function () { rotate(); AT.toast('New QR generated'); };
+AT.$('#b-newcode').onclick = function () { AT.api.newCode().then(function (a) { A = Object.assign(a, { tokenAt: A.tokenAt }); modeView(); AT.toast('New code generated'); }); };
+document.querySelectorAll('[name=lm]').forEach(function (r) { r.onchange = function () { AT.api.patchActive({ method: r.value }).then(function (a) { A = Object.assign(a, { tokenAt: A.tokenAt }); modeView(); AT.toast(r.value === 'qr' ? 'Switched to QR' : 'Switched to one-time code', 'info'); }); }; });
+AT.$('#late-in').onchange = function () { AT.api.patchActive({ lateAfter: Number(this.value) }).then(function (a) { A.lateAfter = a.lateAfter; AT.toast('Late setting updated'); }); };
+AT.$('#cplnk').onclick = function (e) { e.preventDefault(); AT.copy(AT.studentUrl('scan.html')); };
+AT.$('#b-corner').onclick = function () { AT.$('#corner').classList.toggle('show'); };
+AT.$('#c-x').onclick = function () { AT.$('#corner').classList.remove('show'); };
+AT.$('#b-full').onclick = function () { AT.$('#fs-title').textContent = AT.$('#l-course').textContent; AT.$('#fs').classList.add('show'); };
+AT.$('#fs-x').onclick = function () { AT.$('#fs').classList.remove('show'); };
+AT.$('#b-print').onclick = function () { AT.$('#pr-course').textContent = AT.$('#l-course').textContent; AT.$('#pr-valid').textContent = 'Valid for ' + A.qrMinutes + ' minutes after printing.'; window.print(); };
+AT.$('#b-dl').onclick = function () { const a = document.createElement('a'); a.href = AT.$('#pc').toDataURL('image/png'); a.download = 'attender-qr.png'; a.click(); };
+AT.$('#b-sim').onclick = function () { AT.api.simulateArrival().then(refresh); };
+AT.$('#b-close').onclick = function () { AT.confirm({ title: 'Close attendance?', text: 'Students who have not checked in will be marked absent. You can correct records afterwards, with an audit log.', ok: 'Close attendance', danger: true, icon: 'stop-circle' }).then(function (ok) { if (!ok) return;
+  AT.api.closeSession().then(function (se) { clearInterval(tick); AT.$('#corner').classList.remove('show'); A = null; AT.toast('Attendance closed. Absent students were recorded.'); setTimeout(function () { location.href = 'records.html?session=' + se.id; }, 900); }); }); };
+
+AT.api.activeSession().then(function (a) { if (a) { A = a; A.tokenAt = A.tokenAt || new Date(a.opened).getTime(); startLive(); } else { show('setup'); setupInit(); } });
+</script>
+</body>
+</html>

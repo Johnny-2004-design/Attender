@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="ATTENDER logo">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2f8be0"/>
+      <stop offset="1" stop-color="#0A66C2"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="12" fill="url(#g)"/>
+  <path d="M24 9.5 36 14v9.2c0 7.2-4.9 12.6-12 15.3-7.1-2.7-12-8.1-12-15.3V14l12-4.5Z" fill="none" stroke="#fff" stroke-width="2.6" stroke-linejoin="round"/>
+  <path d="m18 24.2 4.4 4.4L30.4 20" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

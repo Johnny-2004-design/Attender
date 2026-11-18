@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="">
+<title>Settings — ATTENDER</title>
+<link rel="icon" href="../assets/img/logo.svg">
+<link rel="stylesheet" href="../assets/vendor/bootstrap/bootstrap.min.css">
+<link rel="stylesheet" href="../assets/vendor/icons/bootstrap-icons.min.css">
+<link rel="stylesheet" href="../assets/css/attender.css">
+</head>
+<body>
+<div id="app-root">
+<div class="page-head"><div><h2>Settings</h2><p>Default verification policy for your attendance sessions.</p></div><button class="btn btn-primary" id="save"><i class="bi bi-check2 me-2"></i>Save settings</button></div>
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="at-card mb-3"><div class="at-card-header"><h5>Location (GPS)</h5></div><div class="at-card-body">
+      <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" id="gps"><label class="form-check-label fw-600" for="gps">Require GPS verification by default</label></div>
+      <div class="row g-3">
+        <div class="col-md-6"><label class="form-label">Default radius (m)</label><input type="number" min="10" max="500" class="form-control" id="rad"></div>
+        <div class="col-md-6"><label class="form-label">Flag readings less accurate than (m)</label><input type="number" min="10" max="500" class="form-control" id="acc"><div class="form-text">Low-confidence readings go to review instead of being rejected.</div></div>
+        <div class="col-12"><label class="form-label">Saved classroom location</label><input class="form-control mb-2" id="loc" placeholder="Name, e.g. Lecture Hall A"><div class="d-flex gap-2 align-items-center"><button class="btn btn-soft btn-sm" id="here" type="button"><i class="bi bi-crosshair me-1"></i>Use my current location</button><span class="small text-muted" id="coords"></span></div></div>
+      </div></div></div>
+    <div class="at-card"><div class="at-card-header"><h5>Attendance codes and QR</h5></div><div class="at-card-body"><div class="row g-3">
+      <div class="col-md-6"><label class="form-label">Live QR refresh (seconds)</label><input type="number" min="10" max="120" class="form-control" id="rot"></div>
+      <div class="col-md-6"><label class="form-label">Max code attempts per student</label><input type="number" min="1" max="10" class="form-control" id="att"></div>
+    </div></div></div>
+  </div>
+  <div class="col-lg-6">
+    <div class="at-card mb-3"><div class="at-card-header"><h5>Face verification</h5></div><div class="at-card-body">
+      <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" id="face" checked disabled><label class="form-check-label fw-600" for="face">Require face + liveness verification</label></div>
+      <label class="form-label">Match threshold: <b id="thv"></b></label><input type="range" class="form-range" id="th" min="0.6" max="0.95" step="0.01"><div class="form-text mb-3">Higher is stricter and rejects more genuine students in poor light.</div>
+      <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="allow"><label class="form-check-label" for="allow">Allow me to turn face verification off for a session</label></div>
+      <div class="form-text">When off, face verification can never be disabled while taking attendance.</div>
+    </div></div>
+    <div class="at-card mb-3"><div class="at-card-header"><h5>Privacy and biometric data</h5></div><div class="at-card-body small">
+      <p>Face templates are stored encrypted, are visible only to the server’s verification engine and are never shown to lecturers as images beyond the registration review.</p>
+      <label class="form-label">Delete face templates after</label><select class="form-select mb-2" id="ret"><option value="12">12 months</option><option value="6">6 months</option><option value="0">When the student leaves my class</option></select>
+      <div class="text-muted">Students give explicit consent during registration.</div></div></div>
+    <div class="at-card"><div class="at-card-header"><h5>Fixture data</h5></div><div class="at-card-body small"><p class="text-muted">This preview stores sample data in your browser. Reset to restore the original samples.</p><button class="btn btn-ghost text-danger btn-sm" id="reset"><i class="bi bi-arrow-counterclockwise me-1"></i>Reset sample data</button></div></div>
+  </div>
+</div>
+</div>
+<script src="../assets/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+<script src="../assets/vendor/chartjs/chart.umd.js"></script>
+<script src="../assets/vendor/qrcode/qrcode.min.js"></script>
+<script src="../assets/js/config.js"></script><script src="../assets/js/api.js"></script>
+<script src="../assets/js/core.js"></script>
+<script>
+AT.shell({ title: "Settings", active: "settings", crumb: "Account" });
+let S;
+function put() { AT.$('#gps').checked = S.requireGps !== false; AT.$('#rad').value = S.defaultRadius; AT.$('#acc').value = S.minAccuracy; AT.$('#loc').value = S.locName || ''; AT.$('#coords').textContent = S.lat ? S.lat.toFixed(5) + ', ' + S.lng.toFixed(5) : 'Not set'; AT.$('#rot').value = S.qrRotateSeconds; AT.$('#att').value = S.maxCodeAttempts; AT.$('#th').value = S.faceThreshold; AT.$('#thv').textContent = Math.round(S.faceThreshold * 100) + '%'; AT.$('#allow').checked = !!S.allowDisableFace; AT.$('#ret').value = S.retention || '12'; }
+AT.api.settings().then(function (s) { S = s; put(); });
+AT.$('#th').oninput = function () { AT.$('#thv').textContent = Math.round(this.value * 100) + '%'; };
+AT.$('#here').onclick = function () { navigator.geolocation ? navigator.geolocation.getCurrentPosition(function (p) { S.lat = p.coords.latitude; S.lng = p.coords.longitude; AT.$('#coords').textContent = S.lat.toFixed(5) + ', ' + S.lng.toFixed(5) + ' (±' + Math.round(p.coords.accuracy) + ' m)'; }, function () { AT.toast('Location permission was denied or unavailable.', 'error'); }, { enableHighAccuracy: true, timeout: 15000 }) : AT.toast('No location support in this browser.', 'error'); };
+AT.$('#save').onclick = function () { const n = function (i) { return Number(AT.$('#' + i).value); };
+  if (n('rad') < 10 || n('rot') < 10 || n('att') < 1) return AT.toast('Please check the highlighted values.', 'error');
+  AT.api.saveSettings({ requireGps: AT.$('#gps').checked, defaultRadius: n('rad'), minAccuracy: n('acc'), locName: AT.$('#loc').value.trim(), lat: S.lat, lng: S.lng, qrRotateSeconds: n('rot'), maxCodeAttempts: n('att'), faceThreshold: n('th'), allowDisableFace: AT.$('#allow').checked, retention: AT.$('#ret').value }).then(function () { AT.toast('Settings saved'); }); };
+AT.$('#reset').onclick = function () {
+  AT.confirm({ title: 'Reset sample data?', text: 'Re-run php database/seed.php on the server to restore the demo dataset. This button does not wipe the live database from the browser.', danger: true, ok: 'Got it' }).then(function () {
+    AT.toast('On the server: php database/seed.php', 'info');
+  });
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ATTENDER — Smart Attendance, Verified Presence</title>
+  <meta name="description" content="ATTENDER verifies classroom attendance with QR or one-time codes, GPS and face recognition.">
+  <link rel="icon" href="assets/img/logo.svg">
+  <link rel="stylesheet" href="assets/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="assets/vendor/icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="assets/css/attender.css">
+</head>
+<body>
+<header class="nav-public" style="background:#fff;border-bottom:1px solid var(--at-line)">
+  <div class="container d-flex align-items-center justify-content-between">
+    <a href="index.html" class="d-flex align-items-center gap-2 text-dark">
+      <img src="assets/img/logo.svg" width="34" alt=""><b style="letter-spacing:.06em;font-size:1.15rem">ATTENDER</b>
+    </a>
+    <nav class="d-none d-md-flex gap-4 fw-600">
+      <a href="#features" class="text-dark">Features</a><a href="#how" class="text-dark">How it works</a><a href="#security" class="text-dark">Security</a>
+    </nav>
+    <div class="d-flex gap-2">
+      <a href="auth/login.html" class="btn btn-ghost">Lecturer login</a>
+      <a href="student/scan.html" class="btn btn-primary d-none d-sm-inline-flex">Mark attendance</a>
+    </div>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="container">
+    <div class="row align-items-center g-5">
+      <div class="col-lg-7">
+        <span class="pill mb-3"><i class="bi bi-shield-check"></i> Built for real classrooms</span>
+        <h1>Smart attendance. <em>Verified presence.</em></h1>
+        <p class="lead text-muted mt-3" style="max-width:560px">Students scan. Lecturers manage. ATTENDER verifies — with a secure QR code or one-time code, the student’s location and a live face check, so every “present” is a real one.</p>
+        <div class="d-flex flex-wrap gap-2 mt-4">
+          <a href="auth/register.html" class="btn btn-primary btn-lg"><i class="bi bi-person-plus me-2"></i>Create lecturer account</a>
+          <a href="student/scan.html" class="btn btn-ghost btn-lg bg-white"><i class="bi bi-qr-code-scan me-2"></i>I’m a student</a>
+        </div>
+        <div class="d-flex flex-wrap gap-4 mt-4 text-muted small">
+          <span><i class="bi bi-check2-circle text-success me-1"></i>No student dashboard to learn</span>
+          <span><i class="bi bi-check2-circle text-success me-1"></i>Works on a classroom Wi-Fi</span>
+          <span><i class="bi bi-check2-circle text-success me-1"></i>Audit-logged corrections</span>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="phone-mock">
+          <div class="screen">
+            <div class="d-flex align-items-center gap-2 mb-3"><img src="assets/img/logo.svg" width="26" alt=""><b style="letter-spacing:.05em">ATTENDER</b></div>
+            <div class="stepper"><div class="done"></div><div class="done"></div><div class="now"></div><div></div></div>
+            <h5 class="mb-1">Verifying you</h5>
+            <p class="text-muted small">CSC 305 · Data Structures</p>
+            <div class="check-row ok"><span class="ci"><i class="bi bi-qr-code"></i></span><div><b>Session confirmed</b><div class="small text-muted">Code accepted</div></div></div>
+            <div class="check-row ok"><span class="ci"><i class="bi bi-geo-alt-fill"></i></span><div><b>Location verified</b><div class="small text-muted">You’re in the classroom</div></div></div>
+            <div class="check-row running"><span class="ci"><i class="bi bi-person-bounding-box"></i></span><div><b>Face check</b><div class="small text-muted">Please blink once…</div></div></div>
+            <div class="check-row"><span class="ci"><i class="bi bi-patch-check"></i></span><div><b>Attendance</b><div class="small text-muted">Waiting</div></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="py-5" id="features">
+  <div class="container">
+    <div class="text-center mb-5"><h2>Everything a lecturer needs. Nothing a student has to learn.</h2><p class="text-muted">Two roles, one verification engine.</p></div>
+    <div class="row g-4">
+      <div class="col-md-6 col-lg-4"><div class="at-card feature hover"><div class="stat-icon blue"><i class="bi bi-qr-code"></i></div><h5>QR or one-time code</h5><p class="text-muted mb-0">Show a rotating QR in a corner of your laptop, print one, or write a six-character code on the board. Both go through the same checks.</p></div></div>
+      <div class="col-md-6 col-lg-4"><div class="at-card feature hover"><div class="stat-icon green"><i class="bi bi-geo-alt-fill"></i></div><h5>GPS radius check</h5><p class="text-muted mb-0">Set the classroom location and a radius (20 m, 30 m, 50 m or your own). Low-accuracy readings are flagged for review.</p></div></div>
+      <div class="col-md-6 col-lg-4"><div class="at-card feature hover"><div class="stat-icon amber"><i class="bi bi-person-bounding-box"></i></div><h5>Face match + liveness</h5><p class="text-muted mb-0">A live face is compared with the student’s registered template, with a random blink or head-turn challenge to defeat photos.</p></div></div>
+      <div class="col-md-6 col-lg-4"><div class="at-card feature hover"><div class="stat-icon dark"><i class="bi bi-diagram-3-fill"></i></div><h5>Register once per class</h5><p class="text-muted mb-0">Students join through your invite link. Approved students are reused across your courses, with enrolment managed separately.</p></div></div>
+      <div class="col-md-6 col-lg-4"><div class="at-card feature hover"><div class="stat-icon red"><i class="bi bi-journal-check"></i></div><h5>Corrections, never silent</h5><p class="text-muted mb-0">Change a record and ATTENDER logs who, when, what changed and why. History is never overwritten.</p></div></div>
+      <div class="col-md-6 col-lg-4"><div class="at-card feature hover"><div class="stat-icon blue"><i class="bi bi-file-earmark-bar-graph-fill"></i></div><h5>PDF and Excel reports</h5><p class="text-muted mb-0">Daily, course, class, semester and per-student reports with attendance percentages.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="py-5" id="how" style="background:#fff;border-block:1px solid var(--at-line)">
+  <div class="container">
+    <div class="text-center mb-4"><h2>How a class session works</h2></div>
+    <div class="row g-3">
+      <div class="col-6 col-lg-3"><div class="flow-step"><div class="n">1</div><h6>Lecturer opens attendance</h6><p class="small text-muted mb-0">Pick the course, radius and method.</p></div></div>
+      <div class="col-6 col-lg-3"><div class="flow-step"><div class="n">2</div><h6>Students scan or enter code</h6><p class="small text-muted mb-0">QR in the corner, or a code on the board.</p></div></div>
+      <div class="col-6 col-lg-3"><div class="flow-step"><div class="n">3</div><h6>ATTENDER verifies</h6><p class="small text-muted mb-0">Session, enrolment, GPS, face, liveness.</p></div></div>
+      <div class="col-6 col-lg-3"><div class="flow-step"><div class="n">4</div><h6>Instant result</h6><p class="small text-muted mb-0">Present, late or a clear reason why not.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="py-5" id="security">
+  <div class="container">
+    <div class="row g-4 align-items-center">
+      <div class="col-lg-6"><h2>Security that lives on the server</h2>
+        <p class="text-muted">The browser only collects evidence. The decision is made by the backend, every time.</p>
+        <ul class="list-unstyled d-grid gap-2 mb-0">
+          <li><i class="bi bi-check-circle-fill text-success me-2"></i>Unpredictable session tokens and codes with attempt limits</li>
+          <li><i class="bi bi-check-circle-fill text-success me-2"></i>Haversine distance check with recorded GPS accuracy</li>
+          <li><i class="bi bi-check-circle-fill text-success me-2"></i>Database-level duplicate prevention</li>
+          <li><i class="bi bi-check-circle-fill text-success me-2"></i>Lecturer-level data isolation and audit logs</li>
+          <li><i class="bi bi-check-circle-fill text-success me-2"></i>Explicit consent before any face registration</li>
+        </ul>
+      </div>
+      <div class="col-lg-6"><div class="at-card at-card-body">
+        <h6 class="mb-3">Verification sequence</h6>
+        <div class="d-grid gap-2">
+          <div class="check-row ok mb-0"><span class="ci">1</span><b>Session valid and open</b></div>
+          <div class="check-row ok mb-0"><span class="ci">2</span><b>Student approved and enrolled</b></div>
+          <div class="check-row ok mb-0"><span class="ci">3</span><b>Inside the classroom radius</b></div>
+          <div class="check-row ok mb-0"><span class="ci">4</span><b>Face matches the registered template</b></div>
+          <div class="check-row ok mb-0"><span class="ci">5</span><b>Live person, not a photo</b></div>
+          <div class="check-row ok mb-0"><span class="ci">6</span><b>No duplicate for this session</b></div>
+        </div></div></div>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container d-flex flex-wrap justify-content-between gap-3">
+    <div class="d-flex align-items-center gap-2 text-white"><img src="assets/img/logo.svg" width="28" alt=""><b style="letter-spacing:.06em">ATTENDER</b><span class="ms-2 small" style="color:#9bb0c9">Smart Attendance, Verified Presence</span></div>
+    <div class="small">© <span id="yr"></span> ATTENDER</div>
+  </div>
+</footer>
+<script>document.getElementById('yr').textContent = new Date().getFullYear();</script>
+</body>
+</html>

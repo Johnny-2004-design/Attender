@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="">
+<title>Reports — ATTENDER</title>
+<link rel="icon" href="../assets/img/logo.svg">
+<link rel="stylesheet" href="../assets/vendor/bootstrap/bootstrap.min.css">
+<link rel="stylesheet" href="../assets/vendor/icons/bootstrap-icons.min.css">
+<link rel="stylesheet" href="../assets/css/attender.css">
+</head>
+<body>
+<div id="app-root">
+<div class="page-head"><div><h2>Reports</h2><p>Generate attendance reports from your records and export them.</p></div>
+  <div class="d-flex gap-2"><button class="btn btn-ghost bg-white" id="xl"><i class="bi bi-file-earmark-excel me-2 text-success"></i>Export Excel</button><button class="btn btn-primary" id="pdf"><i class="bi bi-file-earmark-pdf me-2"></i>Save as PDF</button></div></div>
+<div class="row g-3">
+  <div class="col-lg-3"><div class="at-card at-card-body">
+    <label class="form-label">Report type</label>
+    <select class="form-select mb-3" id="type"><option value="course">Course attendance</option><option value="class">Class summary</option><option value="student">Individual student</option><option value="daily">Daily report</option><option value="semester">Semester report</option></select>
+    <div id="opt-course" class="mb-3"><label class="form-label">Course</label><select class="form-select" id="course"></select></div>
+    <div id="opt-class" class="mb-3 d-none"><label class="form-label">Class</label><select class="form-select" id="cls"></select></div>
+    <div id="opt-student" class="mb-3 d-none"><label class="form-label">Student</label><select class="form-select" id="stu"></select></div>
+    <div id="opt-daily" class="mb-3 d-none"><label class="form-label">Date</label><input type="date" class="form-control" id="day"></div>
+    <div class="form-text"><i class="bi bi-info-circle me-1"></i>Percentages count present and late as attended.</div>
+  </div></div>
+  <div class="col-lg-9"><div class="at-card" id="rep"><div class="at-card-body">Loading…</div></div></div>
+</div>
+<div class="print-only" id="printarea"></div>
+</div>
+<script src="../assets/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+<script src="../assets/vendor/chartjs/chart.umd.js"></script>
+<script src="../assets/vendor/qrcode/qrcode.min.js"></script>
+<script src="../assets/js/config.js"></script><script src="../assets/js/api.js"></script>
+<script src="../assets/js/core.js"></script>
+<script>
+AT.shell({ title: "Reports", active: "reports", crumb: "Attendance" });
+let recs = [], courses = [], classes = [], students = [], current = { head: [], rows: [], title: '', sub: '' };
+const pct = function (a, t) { return t ? Math.round(a / t * 100) : 0; };
+function vis() { ['course', 'class', 'student', 'daily'].forEach(function (k) { AT.$('#opt-' + k).classList.toggle('d-none', AT.$('#type').value !== k && !(k === 'course' && AT.$('#type').value === 'semester')); }); }
+function build() {
+  const t = AT.$('#type').value; let head, rows, title, sub = AT.fmtDate(new Date().toISOString());
+  if (t === 'course' || t === 'semester') {
+    const cs = t === 'course' ? courses.filter(function (c) { return String(c.id) === AT.$('#course').value; }) : courses;
+    head = ['Student', 'Index number', 'Course', 'Code', 'Class', 'Sessions', 'Attended', 'Attendance %']; rows = [];
+    cs.forEach(function (c) { const m = {}; recs.filter(function (r) { return r.course.id === c.id; }).forEach(function (r) { const k = r.student.id; m[k] = m[k] || { s: r.student, n: 0, a: 0 }; m[k].n++; if (r.status === 'present' || r.status === 'late') m[k].a++; });
+      Object.keys(m).forEach(function (k) { const x = m[k]; rows.push([x.s.name, x.s.index, c.title, c.code, c.class.name, x.n, x.a, pct(x.a, x.n) + '%']); }); });
+    title = t === 'course' ? 'Course attendance report' : 'Semester attendance report';
+  } else if (t === 'class') {
+    head = ['Class', 'Course', 'Code', 'Sessions held', 'Enrolled', 'Average attendance %']; rows = courses.filter(function (c) { return String(c.classId) === AT.$('#cls').value; }).map(function (c) { const rs = recs.filter(function (r) { return r.course.id === c.id; }); const a = rs.filter(function (r) { return r.status === 'present' || r.status === 'late'; }).length; return [c.class.name, c.title, c.code, c.sessions, c.enrolled, pct(a, rs.length) + '%']; });
+    title = 'Class attendance summary';
+  } else if (t === 'student') {
+    head = ['Date', 'Course', 'Code', 'Class', 'Status', 'Time']; const rs = recs.filter(function (r) { return String(r.student.id) === AT.$('#stu').value; }).sort(function (a, b) { return new Date(a.session.date) - new Date(b.session.date); });
+    rows = rs.map(function (r) { return [AT.fmtDate(r.session.date), r.course.title, r.course.code, r.class.name, r.status.toUpperCase(), AT.fmtTime(r.time)]; }); const a = rs.filter(function (r) { return r.status === 'present' || r.status === 'late'; }).length;
+    const s = students.find(function (x) { return String(x.id) === AT.$('#stu').value; }); title = 'Student attendance report'; sub = (s ? s.name + ' · ' + s.index + ' · ' : '') + 'Overall ' + pct(a, rs.length) + '%';
+  } else {
+    head = ['Student', 'Index number', 'Course', 'Code', 'Class', 'Status', 'Time']; const d = AT.$('#day').value; const rs = recs.filter(function (r) { return r.session.date.slice(0, 10) === d; });
+    rows = rs.map(function (r) { return [r.student.name, r.student.index, r.course.title, r.course.code, r.class.name, r.status.toUpperCase(), AT.fmtTime(r.time)]; }); title = 'Daily attendance report'; sub = AT.fmtDate(d);
+  }
+  current = { head: head, rows: rows, title: title, sub: sub }; draw();
+}
+function table(c) { return '<table class="at-table"><thead><tr>' + c.head.map(function (h) { return '<th>' + AT.esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>' + c.rows.map(function (r) { return '<tr>' + r.map(function (x, i) { return '<td>' + (c.head[i] === 'Status' ? AT.badge(String(x).toLowerCase()) : AT.esc(x)) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table>'; }
+function draw() { const c = current; AT.$('#rep').innerHTML = '<div class="at-card-header"><div><h5>' + AT.esc(c.title) + '</h5><div class="small text-muted">' + AT.esc(c.sub) + ' · ' + c.rows.length + ' row' + (c.rows.length === 1 ? '' : 's') + '</div></div></div><div class="table-responsive">' + (c.rows.length ? table(c) : AT.empty('file-earmark-x', 'No data for this selection', 'Pick another course, class, student or date.')) + '</div>'; }
+Promise.all([AT.api.records(), AT.api.courses(), AT.api.classes(), AT.api.students()]).then(function (r) { recs = r[0]; courses = r[1]; classes = r[2]; students = r[3];
+  AT.$('#course').innerHTML = courses.map(function (c) { return '<option value="' + c.id + '">' + AT.esc(c.code + ' — ' + c.title) + '</option>'; }).join(''); AT.$('#cls').innerHTML = classes.map(function (c) { return '<option value="' + c.id + '">' + AT.esc(c.name) + '</option>'; }).join('');
+  AT.$('#stu').innerHTML = students.map(function (s) { return '<option value="' + s.id + '">' + AT.esc(s.name) + '</option>'; }).join('');
+  const days = recs.map(function (r) { return r.session.date.slice(0, 10); }).sort(); AT.$('#day').value = days[days.length - 1] || ''; vis(); build(); });
+['type', 'course', 'cls', 'stu', 'day'].forEach(function (i) { AT.$('#' + i).addEventListener('change', function () { vis(); build(); }); });
+AT.$('#xl').onclick = function () {
+  if (!current.rows.length) return AT.toast('Nothing to export.', 'error');
+  const courseId = AT.$('#type').value === 'course' ? AT.$('#course').value : '';
+  if (AT.api.exportReport) {
+    AT.api.exportReport('xlsx', courseId ? { courseId: courseId } : {});
+    AT.toast('Downloading Excel report…');
+  } else {
+    AT.download(current.title.toLowerCase().replace(/\s+/g, '-') + '.csv', '\uFEFF' + AT.csv([current.head].concat(current.rows)));
+    AT.toast('Exported (CSV opens in Excel)');
+  }
+};
+AT.$('#pdf').onclick = function () {
+  if (!current.rows.length) return AT.toast('Nothing to print.', 'error');
+  const courseId = AT.$('#type').value === 'course' ? AT.$('#course').value : '';
+  if (AT.api.exportReport) {
+    AT.api.exportReport('pdf', courseId ? { courseId: courseId } : {});
+    AT.toast('Downloading PDF report…');
+  } else {
+    AT.$('#printarea').innerHTML = '<div style="text-align:left;padding:24px"><div style="display:flex;align-items:center;gap:10px;margin-bottom:16px"><img src="../assets/img/logo.svg" width="36"><b style="letter-spacing:.06em;font-size:1.2rem">ATTENDER</b></div><h3>' + AT.esc(current.title) + '</h3><p>' + AT.esc(current.sub) + '</p>' + table(current).replace('class="at-table"', 'class="table table-sm table-bordered"') + '</div>';
+    window.print();
+  }
+};
+</script>
+</body>
+</html>

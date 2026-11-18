@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="">
+<title>Attendance Records — ATTENDER</title>
+<link rel="icon" href="../assets/img/logo.svg">
+<link rel="stylesheet" href="../assets/vendor/bootstrap/bootstrap.min.css">
+<link rel="stylesheet" href="../assets/vendor/icons/bootstrap-icons.min.css">
+<link rel="stylesheet" href="../assets/css/attender.css">
+</head>
+<body>
+<div id="app-root">
+<div class="page-head"><div><h2>Attendance records</h2><p>Corrections are never silent: each one is written to the audit log.</p></div></div>
+<ul class="nav nav-tabs-at mb-3" role="tablist"><li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#t-rec">Records</button></li><li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#t-aud">Audit log</button></li></ul>
+<div class="tab-content">
+<div class="tab-pane fade show active" id="t-rec">
+  <div class="at-card"><div class="at-card-header flex-wrap">
+    <div class="input-icon" style="flex:1;min-width:200px;max-width:280px"><i class="bi bi-search"></i><input class="form-control" id="q" placeholder="Student or index"></div>
+    <select class="form-select" id="fcl" style="max-width:200px"><option value="">All classes</option></select>
+    <select class="form-select" id="fco" style="max-width:200px"><option value="">All courses</option></select>
+    <select class="form-select" id="fst" style="max-width:170px"><option value="">All statuses</option><option value="present">Present</option><option value="late">Late</option><option value="absent">Absent</option><option value="review">Pending review</option></select>
+    <input type="date" class="form-control" id="fd" style="max-width:170px" title="Date">
+    <button class="btn btn-ghost btn-sm" id="clr">Clear</button></div>
+  <div id="sbanner"></div>
+  <div class="table-responsive" id="tbl"></div>
+  <div class="p-3 small text-muted border-top" id="foot"></div></div>
+</div>
+<div class="tab-pane fade" id="t-aud"><div class="at-card"><div id="aud"></div></div></div>
+</div>
+
+<div class="modal fade" id="m" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><form class="modal-content" id="f"><div class="modal-header"><h5 class="modal-title">Correct attendance</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body"><div id="who" class="mb-3"></div>
+    <label class="form-label">New status</label><select class="form-select mb-3" id="ns"><option value="present">Present</option><option value="late">Late</option><option value="absent">Absent</option></select>
+    <label class="form-label">Reason for correction *</label><textarea class="form-control" id="rs" rows="3" required placeholder="Explain why this record is being changed"></textarea>
+    <div class="small text-muted mt-2"><i class="bi bi-shield-lock me-1"></i>The previous status, your name, the time and this reason are saved in the audit log.</div></div>
+  <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Save correction</button></div></form></div></div>
+</div>
+<script src="../assets/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+<script src="../assets/vendor/chartjs/chart.umd.js"></script>
+<script src="../assets/vendor/qrcode/qrcode.min.js"></script>
+<script src="../assets/js/config.js"></script><script src="../assets/js/api.js"></script>
+<script src="../assets/js/core.js"></script>
+<script>
+AT.shell({ title: "Attendance Records", active: "records", crumb: "Attendance" });
+let all = [], cur = null; const modal = new bootstrap.Modal('#m'); const sessionFilter = Number(new URLSearchParams(location.search).get('session')) || null;
+function draw() {
+  const q = AT.$('#q').value.toLowerCase(), cl = AT.$('#fcl').value, co = AT.$('#fco').value, st = AT.$('#fst').value, dt = AT.$('#fd').value;
+  const rows = all.filter(function (r) { return (!sessionFilter || r.sessionId === sessionFilter) && (!cl || String(r.class.id) === cl) && (!co || String(r.course.id) === co) && (!st || r.status === st) && (!dt || r.session.date.slice(0, 10) === dt) && (r.student.name + r.student.index).toLowerCase().indexOf(q) >= 0; })
+    .sort(function (a, b) { return new Date(b.session.date) - new Date(a.session.date) || a.student.name.localeCompare(b.student.name); }).slice(0, 300);
+  AT.$('#tbl').innerHTML = rows.length ? '<table class="at-table"><thead><tr><th>Student</th><th>Course</th><th>Date</th><th>Time</th><th>Distance</th><th>Face match</th><th>Status</th><th></th></tr></thead><tbody>' + rows.map(function (r) {
+    return '<tr><td><div class="d-flex align-items-center gap-2">' + AT.avatar(r.student.name, 32) + '<div><div class="fw-600">' + AT.esc(r.student.name) + '</div><div class="small text-muted mono">' + AT.esc(r.student.index) + '</div></div></div></td><td>' + AT.esc(r.course.code) + '</td><td>' + AT.fmtDate(r.session.date) + '</td><td>' + AT.fmtTime(r.time) + '</td><td>' + (r.distance != null ? r.distance + ' m <span class="text-muted small">±' + r.accuracy + '</span>' : '—') + '</td><td>' + (r.similarity != null ? Math.round(r.similarity * 100) + '%' : '—') + '</td><td>' + AT.badge(r.status) + '</td><td class="text-end"><button class="btn btn-sm btn-ghost" data-id="' + r.id + '"><i class="bi bi-pencil-square me-1"></i>Correct</button></td></tr>'; }).join('') + '</tbody></table>' : AT.empty('inbox', 'No records match', 'Adjust the filters to see more.');
+  AT.$('#foot').textContent = 'Showing ' + rows.length + ' record' + (rows.length === 1 ? '' : 's') + (rows.length === 300 ? ' (first 300)' : '');
+}
+function audit() { AT.api.audit().then(function (a) { AT.$('#aud').innerHTML = a.length ? a.map(function (x) { return '<div class="feed-item align-items-start"><div class="stat-icon blue" style="width:38px;height:38px;font-size:1rem"><i class="bi bi-journal-text"></i></div><div class="flex-grow-1"><div class="fw-600">' + AT.esc(x.action) + '</div><div class="small">' + AT.esc(x.detail) + '</div>' + (x.reason ? '<div class="small text-muted">Reason: ' + AT.esc(x.reason) + '</div>' : '') + '</div><div class="text-end small text-muted">' + AT.esc(x.actor) + '<br>' + AT.fmtDate(x.at, true) + '</div></div>'; }).join('') : AT.empty('journal', 'Nothing logged', 'Corrections and decisions will appear here.'); }); }
+Promise.all([AT.api.records(), AT.api.classes(), AT.api.courses()]).then(function (r) { all = r[0];
+  AT.$('#fcl').innerHTML += r[1].map(function (c) { return '<option value="' + c.id + '">' + AT.esc(c.name) + '</option>'; }).join(''); AT.$('#fco').innerHTML += r[2].map(function (c) { return '<option value="' + c.id + '">' + AT.esc(c.code) + '</option>'; }).join('');
+  if (sessionFilter) AT.$('#sbanner').innerHTML = '<div class="px-3 py-2 small d-flex justify-content-between" style="background:var(--at-primary-50)"><span><i class="bi bi-funnel me-1"></i>Filtered to one session</span><a href="records.html">Show all</a></div>'; draw(); audit(); });
+['q', 'fcl', 'fco', 'fst', 'fd'].forEach(function (i) { AT.$('#' + i).addEventListener('input', draw); });
+AT.$('#clr').onclick = function () { ['q', 'fcl', 'fco', 'fst', 'fd'].forEach(function (i) { AT.$('#' + i).value = ''; }); draw(); };
+document.addEventListener('click', function (e) { const b = e.target.closest('[data-id]'); if (!b) return; cur = all.find(function (r) { return r.id === Number(b.dataset.id); });
+  AT.$('#who').innerHTML = '<div class="d-flex align-items-center gap-3">' + AT.avatar(cur.student.name) + '<div class="flex-grow-1"><b>' + AT.esc(cur.student.name) + '</b><div class="small text-muted">' + AT.esc(cur.course.code) + ' · ' + AT.fmtDate(cur.session.date) + '</div></div>' + AT.badge(cur.status) + '</div>'; AT.$('#ns').value = cur.status === 'present' ? 'absent' : 'present'; AT.$('#rs').value = ''; modal.show(); });
+AT.$('#f').onsubmit = function (e) { e.preventDefault(); const rs = AT.$('#rs').value.trim(); if (!rs) { AT.$('#rs').classList.add('is-invalid'); return; }
+  if (AT.$('#ns').value === cur.status) return AT.toast('Choose a different status.', 'error');
+  AT.api.correctRecord(cur.id, AT.$('#ns').value, rs).then(function () { modal.hide(); AT.toast('Correction saved and logged'); AT.api.records().then(function (r) { all = r; draw(); audit(); }); }); };
+</script>
+</body>
+</html>

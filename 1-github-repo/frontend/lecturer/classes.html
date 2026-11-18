@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="">
+<title>My Classes — ATTENDER</title>
+<link rel="icon" href="../assets/img/logo.svg">
+<link rel="stylesheet" href="../assets/vendor/bootstrap/bootstrap.min.css">
+<link rel="stylesheet" href="../assets/vendor/icons/bootstrap-icons.min.css">
+<link rel="stylesheet" href="../assets/css/attender.css">
+</head>
+<body>
+<div id="app-root">
+<div class="page-head">
+  <div><h2>My classes</h2><p>Students register once per class through your invitation link.</p></div>
+  <button class="btn btn-primary" id="new-class"><i class="bi bi-plus-lg me-2"></i>New class</button>
+</div>
+<div class="row g-3" id="grid"></div>
+
+<div class="at-card mt-4">
+  <div class="at-card-header"><h5>Registration invitation links</h5><button class="btn btn-soft btn-sm" id="new-inv"><i class="bi bi-link-45deg me-1"></i>Generate link</button></div>
+  <div class="table-responsive" id="invs"></div>
+</div>
+
+<div class="modal fade" id="classModal" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-centered"><form class="modal-content" id="classForm" novalidate>
+  <div class="modal-header"><h5 class="modal-title" id="cmTitle">New class</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body"><input type="hidden" id="c-id"><div class="row g-3">
+    <div class="col-md-8"><label class="form-label">Class name *</label><input class="form-control" id="c-name" placeholder="Level 300 Computer Science" required></div>
+    <div class="col-md-4"><label class="form-label">Level *</label><select class="form-select" id="c-level"><option>100</option><option>200</option><option selected>300</option><option>400</option><option>Postgraduate</option></select></div>
+    <div class="col-md-6"><label class="form-label">Programme *</label><input class="form-control" id="c-prog" placeholder="BSc Computer Science" required></div>
+    <div class="col-md-6"><label class="form-label">Department <span class="text-muted fw-normal">(optional)</span></label><input class="form-control" id="c-dept"></div>
+    <div class="col-md-4"><label class="form-label">Academic year *</label><input class="form-control" id="c-year" value="2026/2027" required></div>
+    <div class="col-md-8"><label class="form-label">Description</label><input class="form-control" id="c-desc"></div>
+  </div></div>
+  <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Save class</button></div>
+</form></div></div>
+
+<div class="modal fade" id="invModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><form class="modal-content" id="invForm">
+  <div class="modal-header"><h5 class="modal-title">New invitation link</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body"><div class="row g-3">
+    <div class="col-12"><label class="form-label">Class</label><select class="form-select" id="i-class"></select></div>
+    <div class="col-6"><label class="form-label">Expires on</label><input type="date" class="form-control" id="i-exp"></div>
+    <div class="col-6"><label class="form-label">Maximum sign-ups</label><input type="number" min="1" class="form-control" id="i-max" value="100"></div>
+    <div class="col-12"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="i-auto"><label class="form-check-label" for="i-auto">Approve automatically <span class="text-muted">(not recommended)</span></label></div></div>
+  </div></div>
+  <div class="modal-footer"><button type="button" class="btn btn-ghost" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary" type="submit">Generate</button></div>
+</form></div></div>
+</div>
+<script src="../assets/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+<script src="../assets/vendor/chartjs/chart.umd.js"></script>
+<script src="../assets/vendor/qrcode/qrcode.min.js"></script>
+<script src="../assets/js/config.js"></script><script src="../assets/js/api.js"></script>
+<script src="../assets/js/core.js"></script>
+<script>
+AT.shell({ title: "My Classes", active: "classes", crumb: "Academics" });
+const cm = new bootstrap.Modal('#classModal'), im = new bootstrap.Modal('#invModal'); let classes = [];
+function inviteUrl(t) { return new URL('../student/join.html?invite=' + encodeURIComponent(t), location.href).href; }
+function render() {
+  AT.api.classes().then(function (list) {
+    classes = list;
+    AT.$('#grid').innerHTML = list.length ? list.map(function (c) { return '<div class="col-md-6 col-xl-4"><div class="at-card hover h-100"><div class="at-card-body">' +
+      '<div class="d-flex justify-content-between align-items-start mb-2"><div class="stat-icon blue"><i class="bi bi-mortarboard-fill"></i></div><div class="dropdown"><button class="btn btn-sm btn-ghost" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></button><ul class="dropdown-menu dropdown-menu-end"><li><a class="dropdown-item" href="#" data-edit="' + c.id + '"><i class="bi bi-pencil me-2"></i>Edit</a></li><li><a class="dropdown-item" href="#" data-inv="' + c.id + '"><i class="bi bi-link-45deg me-2"></i>Invite link</a></li><li><hr class="dropdown-divider"></li><li><a class="dropdown-item text-danger" href="#" data-del="' + c.id + '"><i class="bi bi-trash me-2"></i>Delete</a></li></ul></div></div>' +
+      '<h5 class="mb-0">' + AT.esc(c.name) + '</h5><div class="text-muted small mb-3">' + AT.esc(c.programme) + ' · ' + AT.esc(c.year) + '</div>' +
+      '<div class="row text-center g-2"><div class="col-4"><div class="mini-stat"><b>' + c.students + '</b><span>Students</span></div></div><div class="col-4"><div class="mini-stat"><b>' + c.courses + '</b><span>Courses</span></div></div><div class="col-4"><div class="mini-stat"><b>' + c.pending + '</b><span>Pending</span></div></div></div>' +
+      '</div></div></div>'; }).join('') : '<div class="col-12"><div class="at-card">' + AT.empty('mortarboard', 'No classes yet', 'Create a class to start inviting students.') + '</div></div>';
+  });
+  AT.api.invitations().then(function (list) {
+    AT.$('#invs').innerHTML = list.length ? '<table class="at-table"><thead><tr><th>Class</th><th>Link</th><th>Uses</th><th>Expires</th><th>Status</th><th></th></tr></thead><tbody>' + list.map(function (i) {
+      return '<tr><td class="fw-600">' + AT.esc(i.class ? i.class.name : '—') + '</td><td><code class="small">…' + AT.esc(i.token.slice(-8)) + '</code></td><td>' + i.uses + ' / ' + i.maxUses + '</td><td>' + AT.fmtDate(i.expires) + '</td><td>' + AT.badge(i.status) + '</td>' +
+      '<td class="text-end text-nowrap"><button class="btn btn-sm btn-soft" data-copy="' + AT.esc(i.token) + '"' + (i.status !== 'active' ? ' disabled' : '') + '><i class="bi bi-clipboard me-1"></i>Copy</button> <button class="btn btn-sm btn-ghost" data-wa="' + AT.esc(i.token) + '"' + (i.status !== 'active' ? ' disabled' : '') + ' title="Share on WhatsApp"><i class="bi bi-whatsapp text-success"></i></button> <button class="btn btn-sm btn-ghost text-danger" data-revoke="' + i.id + '"' + (i.status !== 'active' ? ' disabled' : '') + '>Revoke</button></td></tr>'; }).join('') + '</tbody></table>' : AT.empty('link-45deg', 'No invitation links', 'Generate a link and share it with your students.');
+  });
+}
+function openClass(c) { c = c || {}; AT.$('#cmTitle').textContent = c.id ? 'Edit class' : 'New class'; AT.$('#c-id').value = c.id || ''; AT.$('#c-name').value = c.name || ''; AT.$('#c-level').value = c.level || '300'; AT.$('#c-prog').value = c.programme || ''; AT.$('#c-dept').value = c.department || ''; AT.$('#c-year').value = c.year || '2026/2027'; AT.$('#c-desc').value = c.description || ''; cm.show(); }
+function openInv(id) { AT.$('#i-class').innerHTML = classes.map(function (c) { return '<option value="' + c.id + '"' + (c.id === id ? ' selected' : '') + '>' + AT.esc(c.name) + '</option>'; }).join(''); const d = new Date(); d.setDate(d.getDate() + 14); AT.$('#i-exp').value = d.toISOString().slice(0, 10); im.show(); }
+AT.$('#new-class').onclick = function () { openClass(); };
+AT.$('#new-inv').onclick = function () { if (!classes.length) return AT.toast('Create a class first.', 'error'); openInv(); };
+AT.$('#classForm').onsubmit = function (e) {
+  e.preventDefault(); const v = function (i) { return AT.$('#' + i).value.trim(); };
+  if (!v('c-name') || !v('c-prog') || !v('c-year')) return AT.toast('Class name, programme and year are required.', 'error');
+  const o = { name: v('c-name'), level: v('c-level'), programme: v('c-prog'), department: v('c-dept'), year: v('c-year'), description: v('c-desc') }; if (v('c-id')) o.id = Number(v('c-id'));
+  AT.api.saveClass(o).then(function () { cm.hide(); AT.toast('Class saved'); render(); });
+};
+AT.$('#invForm').onsubmit = function (e) { e.preventDefault(); AT.api.createInvitation({ classId: AT.$('#i-class').value, expires: new Date(AT.$('#i-exp').value).toISOString(), maxUses: AT.$('#i-max').value, autoApprove: AT.$('#i-auto').checked }).then(function (inv) { im.hide(); AT.toast('Invitation link created'); render(); AT.copy(inviteUrl(inv.token)); }); };
+document.addEventListener('click', function (e) {
+  const t = e.target.closest('[data-edit],[data-del],[data-inv],[data-copy],[data-wa],[data-revoke]'); if (!t) return; e.preventDefault();
+  if (t.dataset.edit) openClass(classes.find(function (c) { return c.id === Number(t.dataset.edit); }));
+  else if (t.dataset.inv) openInv(Number(t.dataset.inv));
+  else if (t.dataset.copy) AT.copy(inviteUrl(t.dataset.copy));
+  else if (t.dataset.wa) window.open('https://wa.me/?text=' + encodeURIComponent('Register for my class on ATTENDER: ' + inviteUrl(t.dataset.wa)), '_blank', 'noopener');
+  else if (t.dataset.revoke) AT.confirm({ title: 'Revoke this link?', text: 'Students will no longer be able to register with it.', danger: true, ok: 'Revoke' }).then(function (ok) { if (ok) AT.api.revokeInvitation(t.dataset.revoke).then(function () { AT.toast('Link revoked'); render(); }); });
+  else if (t.dataset.del) AT.confirm({ title: 'Delete this class?', text: 'Courses and registrations linked to the class will be affected. This cannot be undone.', danger: true, ok: 'Delete class' }).then(function (ok) { if (ok) AT.api.deleteClass(t.dataset.del).then(function () { AT.toast('Class deleted'); render(); }); });
+});
+render();
+AT.api.classes().then(function (l) { classes = l; if (/invite=1/.test(location.search) && l.length) openInv(); });
+</script>
+</body>
+</html>

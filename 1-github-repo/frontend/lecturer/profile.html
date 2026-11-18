@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="">
+<title>Profile — ATTENDER</title>
+<link rel="icon" href="../assets/img/logo.svg">
+<link rel="stylesheet" href="../assets/vendor/bootstrap/bootstrap.min.css">
+<link rel="stylesheet" href="../assets/vendor/icons/bootstrap-icons.min.css">
+<link rel="stylesheet" href="../assets/css/attender.css">
+</head>
+<body>
+<div id="app-root">
+<div class="page-head"><div><h2>My profile</h2><p>Your details and password.</p></div></div>
+<div class="row g-3">
+  <div class="col-lg-4"><div class="at-card at-card-body text-center"><div id="av" class="mb-3"></div><h5 class="mb-0" id="pn"></h5><div class="text-muted" id="pt"></div><div class="small text-muted mt-1" id="pi"></div>
+    <hr><div class="text-start small"><div class="d-flex justify-content-between py-1"><span class="text-muted">Role</span><b>Lecturer</b></div><div class="d-flex justify-content-between py-1"><span class="text-muted">Data access</span><b>Own classes only</b></div></div></div></div>
+  <div class="col-lg-8">
+    <form class="at-card mb-3" id="pf" novalidate><div class="at-card-header"><h5>Personal details</h5></div><div class="at-card-body row g-3">
+      <div class="col-md-6"><label class="form-label">Full name</label><input class="form-control" id="name" required></div>
+      <div class="col-md-6"><label class="form-label">Title</label><input class="form-control" id="title"></div>
+      <div class="col-md-6"><label class="form-label">Email</label><input type="email" class="form-control" id="email" required></div>
+      <div class="col-md-6"><label class="form-label">Phone</label><input class="form-control" id="phone"></div>
+      <div class="col-md-6"><label class="form-label">Institution</label><input class="form-control" id="inst"></div>
+      <div class="col-md-6"><label class="form-label">Department</label><input class="form-control" id="dept"></div>
+      <div class="col-12 text-end"><button class="btn btn-primary">Save changes</button></div></div></form>
+    <form class="at-card" id="pwf" novalidate><div class="at-card-header"><h5>Change password</h5></div><div class="at-card-body row g-3">
+      <div class="col-12"><label class="form-label">Current password</label><input type="password" class="form-control" id="cp" autocomplete="current-password"></div>
+      <div class="col-md-6"><label class="form-label">New password</label><input type="password" class="form-control" id="np" autocomplete="new-password"></div>
+      <div class="col-md-6"><label class="form-label">Confirm new password</label><input type="password" class="form-control" id="np2" autocomplete="new-password"></div>
+      <div class="col-12 text-end"><button class="btn btn-ghost">Update password</button></div></div></form>
+  </div>
+</div>
+</div>
+<script src="../assets/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+<script src="../assets/vendor/chartjs/chart.umd.js"></script>
+<script src="../assets/vendor/qrcode/qrcode.min.js"></script>
+<script src="../assets/js/config.js"></script><script src="../assets/js/api.js"></script>
+<script src="../assets/js/core.js"></script>
+<script>
+AT.shell({ title: "Profile", active: "profile", crumb: "Account" });
+function put(m) { AT.$('#av').innerHTML = AT.avatar(m.name, 84); AT.$('#pn').textContent = m.name; AT.$('#pt').textContent = m.title || ''; AT.$('#pi').textContent = m.institution || '';
+  AT.$('#name').value = m.name; AT.$('#title').value = m.title || ''; AT.$('#email').value = m.email; AT.$('#phone').value = m.phone || ''; AT.$('#inst').value = m.institution || ''; AT.$('#dept').value = m.department || ''; }
+AT.api.me().then(put);
+AT.$('#pf').onsubmit = function (e) { e.preventDefault(); const v = function (i) { return AT.$('#' + i).value.trim(); };
+  if (!v('name') || !/^\S+@\S+\.\S+$/.test(v('email'))) return AT.toast('Name and a valid email are required.', 'error');
+  AT.api.updateMe({ name: v('name'), title: v('title'), email: v('email'), phone: v('phone'), institution: v('inst'), department: v('dept') }).then(function (m) { put(m); AT.toast('Profile updated'); }); };
+AT.$('#pwf').onsubmit = function (e) { e.preventDefault(); const n = AT.$('#np').value;
+  if (!AT.$('#cp').value) return AT.toast('Enter your current password.', 'error'); if (n.length < 8) return AT.toast('New password must be at least 8 characters.', 'error'); if (n !== AT.$('#np2').value) return AT.toast('The new passwords do not match.', 'error');
+  AT.toast('Password change will be enforced by the backend (Phase 2).', 'info'); this.reset(); };
+</script>
+</body>
+</html>

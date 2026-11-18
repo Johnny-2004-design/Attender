@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0A66C2">
+  <title>Register — ATTENDER</title>
+  <link rel="icon" href="../assets/img/logo.svg">
+  <link rel="stylesheet" href="../assets/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="../assets/vendor/icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../assets/css/attender.css">
+</head>
+<body class="student-body">
+<div class="student-wrap">
+  <div class="student-top"><a href="scan.html" class="brand text-decoration-none"><img src="../assets/img/logo.svg" alt="">ATTENDER</a><a href="scan.html" class="small fw-600">Already registered?</a></div>
+  <div class="offline-banner" id="offline"><i class="bi bi-wifi-off"></i>You are offline. Reconnect to submit your registration.</div>
+  <div class="stepper" id="stp"><div class="now"></div><div></div><div></div></div>
+
+  <div id="invalid" class="at-card at-card-body text-center d-none"><div class="result-icon fail"><i class="bi bi-link-45deg"></i></div><h4>This invitation is not valid</h4><p class="text-muted mb-0">It may have expired or been revoked. Ask your lecturer for a new link.</p></div>
+
+  <!-- Step 1: details -->
+  <section id="s1" class="d-none">
+    <h1 class="step-title">Join <span id="cn">your class</span></h1>
+    <p class="text-muted mb-3">Invited by <b id="ln"></b>. Takes about two minutes.</p>
+    <form id="f" class="at-card at-card-body" novalidate>
+      <div class="mb-3"><label class="form-label" for="name">Full name</label><input class="form-control form-control-lg" id="name" autocomplete="name" required></div>
+      <div class="mb-3"><label class="form-label" for="idx">Student ID / index number</label><input class="form-control form-control-lg mono" id="idx" autocapitalize="characters" required></div>
+      <div class="row g-3 mb-3"><div class="col-8"><label class="form-label" for="prog">Programme</label><input class="form-control" id="prog" required></div><div class="col-4"><label class="form-label" for="lvl">Level</label><input class="form-control" id="lvl" inputmode="numeric" required></div></div>
+      <div class="mb-3"><label class="form-label" for="email">Email</label><input class="form-control" id="email" type="email" autocomplete="email" required></div>
+      <div class="mb-3"><label class="form-label" for="phone">Phone number</label><input class="form-control" id="phone" type="tel" autocomplete="tel" required></div>
+      <div class="alert alert-danger py-2 d-none" id="e1"></div>
+      <button class="btn btn-primary btn-lg w-100" type="submit">Continue<i class="bi bi-arrow-right ms-2"></i></button>
+    </form>
+  </section>
+
+  <!-- Step 2: consent + face -->
+  <section id="s2" class="d-none">
+    <h1 class="step-title">Face registration</h1>
+    <p class="text-muted">This lets ATTENDER confirm that it is really you when you mark attendance.</p>
+    <div class="at-card at-card-body mb-3 small" id="consent">
+      <b class="d-block mb-2"><i class="bi bi-shield-lock me-1 text-primary"></i>How your face data is used</b>
+      <ul class="ps-3 mb-2"><li>Only used to verify your attendance for your lecturer’s classes.</li><li>Stored encrypted. Never shared or sold.</li><li>Deleted when you leave the class or on request.</li><li>You can refuse, but then you cannot use face-verified attendance.</li></ul>
+      <div class="form-check"><input class="form-check-input" type="checkbox" id="agree"><label class="form-check-label" for="agree">I understand and consent to my face being registered.</label></div>
+    </div>
+    <div id="camwrap" class="d-none">
+      <div class="face-box mb-3"><video id="v" autoplay playsinline muted></video><div class="face-oval" id="oval"></div><div class="face-prompt" id="prompt">Position your face inside the oval</div></div>
+      <div class="d-flex gap-2 mb-3" id="shots"></div>
+    </div>
+    <div class="alert alert-danger py-2 d-none" id="e2"></div>
+    <button class="btn btn-primary btn-lg w-100" id="cam" type="button" disabled><i class="bi bi-camera-video me-2"></i>Start camera</button>
+    <button class="btn btn-ghost w-100 mt-2" id="back" type="button">Back</button>
+  </section>
+
+  <!-- Step 3: done -->
+  <section id="s3" class="d-none text-center pt-3">
+    <div class="result-icon wait"><i class="bi bi-hourglass-split"></i></div>
+    <h2>Registration sent</h2>
+    <p class="text-muted">Your lecturer will review it. You will be able to mark attendance once you are approved and enrolled in a course.</p>
+    <div class="at-card at-card-body text-start small mb-3"><div class="d-flex justify-content-between"><span class="text-muted">Name</span><b id="r-n"></b></div><div class="d-flex justify-content-between"><span class="text-muted">Index</span><b id="r-i" class="mono"></b></div><div class="d-flex justify-content-between"><span class="text-muted">Status</span><span class="badge-soft b-pending">Pending approval</span></div></div>
+    <a href="scan.html" class="btn btn-primary btn-lg w-100">Go to attendance</a>
+  </section>
+
+  <section id="s-exist" class="d-none text-center pt-3">
+    <div class="result-icon ok"><i class="bi bi-person-check"></i></div><h2>You are already registered</h2><p class="text-muted" id="ex-t"></p><a href="scan.html" class="btn btn-primary btn-lg w-100">Go to attendance</a>
+  </section>
+</div>
+
+<script src="../assets/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+<script src="../assets/js/config.js"></script><script src="../assets/js/api.js"></script><script src="../assets/js/core.js"></script><script src="../assets/js/student.js"></script>
+<script>
+  const token = new URLSearchParams(location.search).get('invite') || ''; let info, form, stream, shots = [];
+  const steps = ['s1', 's2', 's3']; function go(n) { steps.concat(['s-exist']).forEach(function (s) { AT.$('#' + s).classList.add('d-none'); }); AT.$('#' + (n === 'exist' ? 's-exist' : steps[n])).classList.remove('d-none'); AT.$$('#stp > div').forEach(function (e, i) { e.className = i < n ? 'done' : i === n ? 'now' : ''; }); window.scrollTo(0, 0); }
+  AT.api.inviteInfo(token).then(function (i) { info = i; if (!i.valid) { AT.$('#invalid').classList.remove('d-none'); AT.$('#stp').classList.add('d-none'); return; }
+    AT.$('#cn').textContent = i.class.name; AT.$('#ln').textContent = i.lecturer.name; AT.$('#prog').value = i.class.programme; AT.$('#lvl').value = i.class.level; go(0); });
+
+  AT.$('#f').onsubmit = function (e) { e.preventDefault(); const v = function (i) { return AT.$('#' + i).value.trim(); }; const err = AT.$('#e1');
+    let m = ''; if (v('name').split(/\s+/).length < 2) m = 'Enter your full name (first and last).'; else if (!/^[A-Za-z0-9\/\-]{5,20}$/.test(v('idx'))) m = 'Enter your index number using letters, numbers, / or - only.'; else if (!/^\S+@\S+\.\S+$/.test(v('email'))) m = 'Enter a valid email address.'; else if (v('phone').replace(/\D/g, '').length < 9) m = 'Enter a valid phone number.';
+    if (m) { err.textContent = m; err.classList.remove('d-none'); return; } err.classList.add('d-none');
+    form = { name: v('name'), index: v('idx').toUpperCase(), programme: v('prog'), level: v('lvl'), email: v('email'), phone: v('phone'), classId: info.class.id, token: info.token || token }; go(1); };
+  AT.$('#back').onclick = function () { S.stopCamera(stream); go(0); };
+  AT.$('#agree').onchange = function () { AT.$('#cam').disabled = !this.checked; };
+
+  const prompts = ['Look straight at the camera', 'Slowly turn your head to the left', 'Slowly turn your head to the right']; const S = AT.student;
+  AT.$('#cam').onclick = function () { const btn = this, err = AT.$('#e2'); err.classList.add('d-none');
+    if (!stream) { btn.disabled = true; S.startCamera(AT.$('#v'), 'user').then(function (st) { stream = st; AT.$('#camwrap').classList.remove('d-none'); AT.$('#consent').classList.add('d-none'); btn.disabled = false; btn.innerHTML = '<i class="bi bi-camera me-2"></i>Capture (1 of 3)'; AT.$('#prompt').textContent = prompts[0]; AT.$('#oval').classList.add('good'); })
+      .catch(function (e) { btn.disabled = false; err.textContent = S.cameraError(e); err.classList.remove('d-none'); }); return; }
+    shots.push(S.snapshot(AT.$('#v'), 480)); AT.$('#shots').innerHTML = shots.map(function (s) { return '<img src="' + s + '" class="rounded-3" style="width:30%;aspect-ratio:3/4;object-fit:cover;transform:scaleX(-1)" alt="">'; }).join('');
+    if (shots.length < 3) { btn.innerHTML = '<i class="bi bi-camera me-2"></i>Capture (' + (shots.length + 1) + ' of 3)'; AT.$('#prompt').textContent = prompts[shots.length]; return; }
+    btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Submitting…'; S.stopCamera(stream);
+    // Captured images are posted to the server. Templates are stored under storage/templates (outside public URLs when configured).
+    const payload = Object.assign({}, form, { faceImages: shots.slice() });
+    AT.api.submitRegistration(payload).then(function (r) {
+      if (r.existing) { AT.$('#ex-t').textContent = r.name + ' is already registered for this class (' + r.status + ').'; go('exist'); return; }
+      if (!r.ok || r.retry_face) {
+        btn.disabled = false; btn.innerHTML = '<i class="bi bi-camera me-2"></i>Retake & submit';
+        shots = []; AT.$('#shots').innerHTML = '';
+        AT.$('#e2').textContent = r.reason || 'Face enrollment failed. Retake the three photos and try again.';
+        AT.$('#e2').classList.remove('d-none');
+        return;
+      }
+      if (r.face_enrolled === false) {
+        AT.$('#e2').textContent = (r.face_reason || 'Your registration was saved, but face enrollment is incomplete.') + ' Ask your lecturer to confirm the face service is running, then re-enrol.';
+        AT.$('#e2').classList.remove('d-none');
+      }
+      AT.$('#r-n').textContent = form.name; AT.$('#r-i').textContent = form.index; S.remember('index', form.index); go(2);
+    }).catch(function (ex) {
+      btn.disabled = false; btn.innerHTML = '<i class="bi bi-camera me-2"></i>Try again';
+      shots = []; AT.$('#shots').innerHTML = '';
+      const msg = (ex && ex.data && (ex.data.reason || ex.data.error)) || (ex && ex.message) || 'Registration failed.';
+      AT.$('#e2').textContent = msg; AT.$('#e2').classList.remove('d-none');
+    }); };
+</script>
+</body>
+</html>

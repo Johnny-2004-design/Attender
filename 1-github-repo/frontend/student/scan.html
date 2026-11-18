@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0A66C2">
+  <title>Mark attendance — ATTENDER</title>
+  <link rel="icon" href="../assets/img/logo.svg">
+  <link rel="stylesheet" href="../assets/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="../assets/vendor/icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../assets/css/attender.css">
+</head>
+<body class="student-body">
+<div class="student-wrap">
+  <div class="student-top"><a href="../index.html" class="brand text-decoration-none"><img src="../assets/img/logo.svg" alt="">ATTENDER</a><a href="#" id="hist" class="small fw-600 d-none">My history</a></div>
+  <div class="offline-banner" id="offline"><i class="bi bi-wifi-off"></i><span>You are offline. Check-ins are saved as <b>Pending</b> and only count after the server verifies them.</span></div>
+  <div class="alert alert-warning small d-none" id="insecure"><i class="bi bi-exclamation-triangle me-1"></i><span id="insecure-t"></span></div>
+
+  <!-- 1. Entry -->
+  <section id="v-entry">
+    <h1 class="step-title">Mark attendance</h1>
+    <p class="text-muted">Scan the QR code your lecturer is showing, or type the code from the board.</p>
+    <div class="mb-3"><label class="form-label" for="idx">Your index number</label><input class="form-control form-control-lg mono" id="idx" autocapitalize="characters" autocomplete="off" placeholder="e.g. 521100123"><div class="form-text" id="idx-hint">Saved on this phone after your first check-in.</div></div>
+    <ul class="nav nav-tabs-at mb-3" role="tablist"><li class="nav-item flex-fill"><button class="nav-link w-100 active" data-bs-toggle="tab" data-bs-target="#t-scan" id="tab-scan"><i class="bi bi-qr-code-scan me-1"></i>Scan QR</button></li><li class="nav-item flex-fill"><button class="nav-link w-100" data-bs-toggle="tab" data-bs-target="#t-code" id="tab-code"><i class="bi bi-keyboard me-1"></i>Enter code</button></li></ul>
+    <div class="tab-content">
+      <div class="tab-pane fade show active" id="t-scan">
+        <div class="scan-box mb-3" id="sbox"><video id="sv" playsinline muted></video><div class="reticle d-none" id="ret"></div><div class="hint" id="shint"></div></div>
+        <button class="btn btn-primary btn-lg w-100" id="sstart"><i class="bi bi-camera-video me-2"></i>Open camera</button>
+      </div>
+      <div class="tab-pane fade" id="t-code">
+        <input class="form-control code-input mono mb-3" id="code" maxlength="6" autocomplete="off" autocapitalize="characters" placeholder="••••••" aria-label="Attendance code">
+        <button class="btn btn-primary btn-lg w-100" id="cgo">Continue<i class="bi bi-arrow-right ms-2"></i></button>
+      </div>
+    </div>
+    <div class="alert alert-danger py-2 mt-3 d-none" id="e0"></div>
+    <div class="text-center mt-4 small text-muted">New here? Ask your lecturer for the registration link.</div>
+  </section>
+
+  <!-- 2. Verification -->
+  <section id="v-verify" class="d-none">
+    <div class="stepper" id="vstp"><div class="done"></div><div class="now"></div><div></div><div></div></div>
+    <h1 class="step-title" id="vt">Verifying you</h1><p class="text-muted" id="vc"></p>
+    <div id="rows">
+      <div class="check-row" id="r-sess"><span class="ci"><i class="bi bi-qr-code"></i></span><div class="flex-grow-1"><b>Session</b><div class="small text-muted" id="r-sess-t">Waiting</div></div></div>
+      <div class="check-row" id="r-gps"><span class="ci"><i class="bi bi-geo-alt-fill"></i></span><div class="flex-grow-1"><b>Location</b><div class="small text-muted" id="r-gps-t">Waiting</div></div></div>
+      <div class="check-row" id="r-face"><span class="ci"><i class="bi bi-person-bounding-box"></i></span><div class="flex-grow-1"><b>Face and liveness</b><div class="small text-muted" id="r-face-t">Waiting</div></div></div>
+      <div class="check-row" id="r-fin"><span class="ci"><i class="bi bi-patch-check"></i></span><div class="flex-grow-1"><b>Attendance</b><div class="small text-muted" id="r-fin-t">Waiting</div></div></div>
+    </div>
+    <div id="facebox" class="d-none mt-3">
+      <div class="face-box"><video id="fv" playsinline muted></video><div class="face-oval" id="oval"></div><div class="face-prompt" id="fp"></div></div>
+      <div class="text-center small text-muted mt-2">Keep your face inside the oval and follow the instruction.</div>
+    </div>
+  </section>
+
+  <!-- 3. Result -->
+  <section id="v-result" class="d-none text-center pt-3">
+    <div class="result-icon" id="ri"><i class="bi"></i></div>
+    <h2 id="rt"></h2><p class="text-muted" id="rm"></p>
+    <div class="at-card at-card-body text-start small mb-3 d-none" id="rd"></div>
+    <button class="btn btn-primary btn-lg w-100" id="again">Done</button>
+    <button class="btn btn-ghost w-100 mt-2 d-none" id="retry">Try again</button>
+  </section>
+</div>
+
+<script src="../assets/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+<script src="../assets/vendor/jsqr/jsQR.js"></script>
+<script src="../assets/js/config.js"></script><script src="../assets/js/api.js"></script><script src="../assets/js/core.js"></script><script src="../assets/js/student.js"></script>
+<script>
+  const S = AT.student; let sStream, stopScan, input = '';
+  const view = function (id) { ['v-entry', 'v-verify', 'v-result'].forEach(function (v) { AT.$('#' + v).classList.toggle('d-none', v !== id); }); window.scrollTo(0, 0); };
+  if (!S.secureOk()) { AT.$('#insecure').classList.remove('d-none'); AT.$('#insecure-t').textContent = S.secureMessage; }
+  const saved = S.recall('index'); if (saved) { AT.$('#idx').value = saved; AT.$('#hist').classList.remove('d-none'); }
+  const sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+  const err0 = function (m) { const e = AT.$('#e0'); e.textContent = m; e.classList.toggle('d-none', !m); };
+  function needIndex() { const v = AT.$('#idx').value.trim(); if (v.length < 5) { err0('Enter your index number first.'); AT.$('#idx').focus(); return null; } err0(''); return v.toUpperCase(); }
+
+  /* ---- entry: QR ---- */
+  AT.$('#sstart').onclick = function () { if (!needIndex()) return; const b = this; b.disabled = true;
+    S.startCamera(AT.$('#sv'), 'environment').then(function (st) { sStream = st; AT.$('#ret').classList.remove('d-none'); AT.$('#shint').textContent = 'Point the camera at the QR code'; b.classList.add('d-none');
+      stopScan = S.scanQR(AT.$('#sv'), function (txt) { S.stopCamera(sStream); begin(S.extractToken(txt)); }); })
+      .catch(function (e) { b.disabled = false; err0(S.cameraError(e) + ' You can use the code tab instead.'); }); };
+  /* ---- entry: code ---- */
+  AT.$('#code').oninput = function () { this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); };
+  AT.$('#cgo').onclick = function () { if (!needIndex()) return; const c = AT.$('#code').value.trim(); if (c.length < 6) return err0('Enter the 6-character code.'); begin(c); };
+  AT.$('#idx').oninput = function () { this.value = this.value.toUpperCase(); };
+
+  const url = new URLSearchParams(location.search).get('t'); if (url) { AT.$('#idx-hint').textContent = 'QR detected. Enter your index number, then continue.'; AT.$('#tab-code').click(); AT.$('#code').value = ''; AT.$('#code').placeholder = 'QR detected'; AT.$('#cgo').onclick = function () { if (needIndex()) begin(url); }; }
+
+  /* ---- verification ---- */
+  function row(id, state, text) { const r = AT.$('#' + id); r.className = 'check-row ' + state; const i = r.querySelector('.ci i'); if (state === 'running') { i.dataset.o = i.dataset.o || i.className; i.className = 'bi bi-arrow-repeat spin'; } else if (state === 'ok') { i.className = 'bi bi-check-lg'; } else if (state === 'fail') { i.className = 'bi bi-x-lg'; } AT.$('#' + id + '-t').textContent = text; }
+  const stepBar = function (n) { AT.$$('#vstp > div').forEach(function (e, i) { e.className = i < n ? 'done' : i === n ? 'now' : ''; }); };
+  function fail(reason, retry) { stepBar(3); AT.$('#vstp').lastElementChild.className = ''; result({ ok: false, reason: reason, retry: retry !== false }); }
+
+  async function begin(raw) {
+    input = raw; const idx = AT.$('#idx').value.trim().toUpperCase(); if (stopScan) stopScan(); view('v-verify'); stepBar(1);
+    ['r-sess', 'r-gps', 'r-face', 'r-fin'].forEach(function (r) { AT.$('#' + r).className = 'check-row'; AT.$('#' + r + '-t').textContent = 'Waiting'; });
+    // 1. session
+    row('r-sess', 'running', 'Checking the attendance code…');
+    if (!navigator.onLine) return offlineQueue(idx);
+    const s = await AT.api.resolveAttendanceInput(input); if (!s.ok) { row('r-sess', 'fail', s.reason); return fail(s.reason); }
+    row('r-sess', 'ok', s.course.code + ' · ' + s.course.title); AT.$('#vc').textContent = s.course.code + ' · ' + s.course.title;
+    // 2. GPS
+    let pos = {};
+    if (s.gps) { row('r-gps', 'running', 'Getting your location…'); stepBar(1);
+      try { pos = await S.getPosition(); } catch (e) { row('r-gps', 'fail', e.message); return fail(e.message); }
+      row('r-gps', 'ok', 'Location captured (±' + Math.round(pos.accuracy) + ' m)'); } else { row('r-gps', 'ok', 'Not required for this session'); }
+    // 3. face + liveness
+    let frames = [];
+    let challenge = null;
+    if (s.face) { stepBar(2); row('r-face', 'running', 'Starting camera…');
+      try { const live = await liveness(); frames = live.frames; challenge = live.challenge; } catch (e) { row('r-face', 'fail', S.cameraError(e)); return fail(S.cameraError(e)); }
+      row('r-face', 'ok', 'Images captured and sent for verification'); } else { row('r-face', 'ok', 'Not required for this session'); }
+    // 4. server verification engine
+    stepBar(3); row('r-fin', 'running', 'Recording…'); await sleep(200);
+    const r = await AT.api.submitAttendance({
+      input: input, index: idx, lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy,
+      faceImages: frames, livenessChallenge: challenge, livenessFrames: frames.slice(1)
+    });
+    if (!r.ok) {
+      row('r-fin', 'fail', r.reason || 'Not recorded');
+      return fail(r.reason || 'Attendance was not recorded by the server.', !/already|enrollment incomplete/i.test(r.reason || ''));
+    }
+    // Success UI only after backend confirmed a saved decision (present/late/pending).
+    S.remember('index', idx); AT.$('#hist').classList.remove('d-none');
+    row('r-fin', 'ok', r.pending ? 'Saved as pending review (not present yet)' : ('Recorded as ' + (r.status || 'present')));
+    result(r);
+  }
+
+  const challenges = [['Blink twice slowly', 'blink'], ['Turn your head to the left', 'left'], ['Turn your head to the right', 'right'], ['Smile', 'smile']];
+  async function liveness() {
+    AT.$('#facebox').classList.remove('d-none'); const v = AT.$('#fv'), oval = AT.$('#oval'), p = AT.$('#fp'); const st = await S.startCamera(v, 'user'); const frames = [];
+    p.textContent = 'Center your face in the oval'; row('r-face', 'running', 'Look at the camera'); await sleep(1400); oval.classList.add('good'); frames.push(S.snapshot(v, 480));
+    // Randomised challenge — server-side provider must verify frames; ATTENDER never fakes success.
+    const c = challenges[Math.floor(Math.random() * challenges.length)]; row('r-face', 'running', 'Follow the instruction');
+    for (let n = 3; n > 0; n--) { p.textContent = c[0] + ' — ' + n; await sleep(1000); if (n === 2) frames.push(S.snapshot(v, 480)); } frames.push(S.snapshot(v, 480));
+    p.textContent = 'Hold still…'; await sleep(400); S.stopCamera(st); AT.$('#facebox').classList.add('d-none'); return { frames: frames, challenge: c[1] };
+  }
+
+  function offlineQueue(idx) { row('r-sess', 'ok', 'Saved on this phone'); const n = S.enqueue({ input: input, index: idx }); stepBar(3);
+    result({ ok: true, queued: true, count: n }); }
+  async function flush() {
+    const q = S.queue(); if (!q.length || !navigator.onLine) return;
+    if (AT.api.flushQueue) { await AT.api.flushQueue(q); S.clearQueue(); }
+    else { S.clearQueue(); for (const it of q) { await AT.api.submitAttendance({ input: it.input, index: it.index }); } }
+    AT.toast('Pending check-ins sent to the server for verification', 'info');
+  }
+  window.addEventListener('online', flush);
+
+  function result(r) {
+    view('v-result'); const ic = AT.$('#ri'), i = ic.querySelector('i'); AT.$('#retry').classList.toggle('d-none', !(r.retry)); const d = AT.$('#rd'); d.classList.add('d-none');
+    if (r.queued) { ic.className = 'result-icon wait'; i.className = 'bi bi-cloud-arrow-up'; AT.$('#rt').textContent = 'Saved — waiting for connection'; AT.$('#rm').textContent = 'Your check-in is PENDING on this phone. It only counts after the server verifies location and face — never from offline alone.'; return; }
+    if (r.ok && r.pending) { ic.className = 'result-icon wait'; i.className = 'bi bi-hourglass-split'; AT.$('#rt').textContent = 'Received — pending review'; AT.$('#rm').textContent = 'The server saved a PENDING record (not Present). Face verification was incomplete or the face service was unavailable.'; }
+    else if (r.ok) { ic.className = 'result-icon ok'; i.className = 'bi bi-check-lg'; AT.$('#rt').textContent = 'Attendance Recorded Successfully.'; AT.$('#rm').textContent = r.status === 'late' ? 'The server marked you late.' : 'The server marked you present.'; }
+    else { ic.className = 'result-icon fail'; i.className = 'bi bi-x-lg'; AT.$('#rt').textContent = 'Attendance Not Recorded.'; AT.$('#rm').textContent = r.reason || 'The server rejected this check-in.'; }
+    if (r.ok && r.course) { d.classList.remove('d-none'); d.innerHTML = '<div class="d-flex justify-content-between py-1"><span class="text-muted">Course</span><b>' + AT.esc(r.course.code) + '</b></div><div class="d-flex justify-content-between py-1"><span class="text-muted">Name</span><b>' + AT.esc(r.name) + '</b></div><div class="d-flex justify-content-between py-1"><span class="text-muted">Time</span><b>' + AT.fmtTime(new Date().toISOString()) + '</b></div>'; }
+  }
+  AT.$('#again').onclick = function () { location.href = 'scan.html'; };
+  AT.$('#retry').onclick = function () { location.href = 'scan.html' + (url ? '?t=' + encodeURIComponent(url) : ''); };
+  AT.$('#hist').onclick = function (e) { e.preventDefault(); AT.toast('Your personal history becomes available once the backend is connected.', 'info'); };
+  flush();
+</script>
+</body>
+</html>

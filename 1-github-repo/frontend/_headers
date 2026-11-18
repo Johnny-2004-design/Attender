@@ -1,0 +1,9 @@
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: SAMEORIGIN
+  # Student scan/join pages need the camera and GPS; allow them for this origin only.
+  Permissions-Policy: camera=(self), geolocation=(self), microphone=()
+
+/assets/js/config.js
+  Cache-Control: no-cache

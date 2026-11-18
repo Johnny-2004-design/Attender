@@ -1,0 +1,39 @@
+<?php
+declare(strict_types=1);
+
+/**
+ * SERVER-LOCAL production overrides for hosts without reliable process env
+ * (e.g. InfinityFree). Copy to local.production.php on the host ONLY.
+ *
+ * - Never commit local.production.php (gitignored).
+ * - Leave passwords blank in any shared copy; fill on the server from the panel.
+ * - XAMPP: do not create this file locally unless you intend to override defaults.
+ *
+ * bootstrap/app.php calls putenv() for each entry before config loads.
+ */
+return [
+    'ATTENDER_ENV' => 'production',
+    'ATTENDER_DEBUG' => '0',
+    // Public HTTPS origin of this deploy (no trailing slash), e.g. https://yoursite.example
+    'ATTENDER_URL' => 'https://YOUR-SUBDOMAIN.example',
+
+    // MySQL from hosting panel (examples only — replace with your panel values)
+    'ATTENDER_DB_HOST' => 'sqlXXX.infinityfree.com',
+    'ATTENDER_DB_PORT' => '3306',
+    'ATTENDER_DB_NAME' => 'if0_XXXX_attender',
+    'ATTENDER_DB_USER' => 'if0_XXXX',
+    // Fill on server only — never store the real password in git or the upload zip.
+    'ATTENDER_DB_PASS' => '',
+
+    // Exact origin(s) of the Netlify frontend, comma-separated, no trailing slash.
+    // Required: without it the browser blocks every API call from the frontend.
+    'ATTENDER_ALLOWED_ORIGINS' => 'https://YOUR-SITE.netlify.app',
+
+    // Presentation default: no Python face-service on shared PHP hosts.
+    'ATTENDER_FACE_PROVIDER' => 'null',
+    'ATTENDER_FACE_API_URL' => '',
+    'ATTENDER_FACE_API_KEY' => '',
+    'ATTENDER_FACE_REQUIRE_EMBEDDING' => '0',
+    'ATTENDER_FACE_REQUIRE_LIVENESS' => '1',
+    'ATTENDER_FACE_UNAVAILABLE_POLICY' => 'pending',
+];

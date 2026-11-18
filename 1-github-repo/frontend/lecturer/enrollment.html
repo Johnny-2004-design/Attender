@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="">
+<title>Course Enrolment — ATTENDER</title>
+<link rel="icon" href="../assets/img/logo.svg">
+<link rel="stylesheet" href="../assets/vendor/bootstrap/bootstrap.min.css">
+<link rel="stylesheet" href="../assets/vendor/icons/bootstrap-icons.min.css">
+<link rel="stylesheet" href="../assets/css/attender.css">
+</head>
+<body>
+<div id="app-root">
+<a href="courses.html" class="text-muted small"><i class="bi bi-arrow-left me-1"></i>Back to courses</a>
+<div class="page-head mt-2"><div><h2 id="ct">Enrolment</h2><p id="cs" class="mb-0"></p></div>
+  <div class="d-flex gap-2"><button class="btn btn-ghost bg-white" id="all">Select all</button><button class="btn btn-ghost bg-white" id="none">Clear</button><button class="btn btn-primary" id="save"><i class="bi bi-check2 me-2"></i>Save enrolment</button></div></div>
+<div class="alert alert-info d-flex gap-2"><i class="bi bi-info-circle"></i><div>Only approved students of this course’s class can be enrolled. Being registered does <b>not</b> enrol a student in every course. Only enrolled students can mark attendance for this course.</div></div>
+<div class="at-card"><div class="at-card-header"><div class="input-icon" style="max-width:320px;flex:1"><i class="bi bi-search"></i><input class="form-control" id="q" placeholder="Search students"></div><span class="badge-soft b-active" id="cnt"></span></div>
+<div class="table-responsive" id="tbl"></div></div>
+</div>
+<script src="../assets/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+<script src="../assets/vendor/chartjs/chart.umd.js"></script>
+<script src="../assets/vendor/qrcode/qrcode.min.js"></script>
+<script src="../assets/js/config.js"></script><script src="../assets/js/api.js"></script>
+<script src="../assets/js/core.js"></script>
+<script>
+AT.shell({ title: "Course Enrolment", active: "courses", crumb: "Academics / Courses" });
+const cid = Number(new URLSearchParams(location.search).get('course')) || 1; let course, studs = [], sel = new Set();
+function draw() { const q = AT.$('#q').value.toLowerCase(); const rows = studs.filter(function (s) { return (s.name + s.index).toLowerCase().indexOf(q) >= 0; });
+  AT.$('#cnt').textContent = sel.size + ' of ' + studs.length + ' enrolled';
+  AT.$('#tbl').innerHTML = rows.length ? '<table class="at-table"><tbody>' + rows.map(function (s) { return '<tr><td style="width:50px"><input type="checkbox" class="form-check-input" data-s="' + s.id + '"' + (sel.has(s.id) ? ' checked' : '') + '></td><td><div class="d-flex align-items-center gap-3">' + AT.avatar(s.name) + '<div><div class="fw-600">' + AT.esc(s.name) + '</div><div class="small text-muted mono">' + AT.esc(s.index) + '</div></div></div></td></tr>'; }).join('') + '</tbody></table>' : AT.empty('people', 'No approved students in this class', 'Approve registration requests first.'); }
+Promise.all([AT.api.courses(), AT.api.students()]).then(function (r) { course = r[0].find(function (c) { return c.id === cid; }) || r[0][0];
+  AT.$('#ct').textContent = course.code + ' — ' + course.title; AT.$('#cs').textContent = course.class.name + ' · ' + course.semester + ' semester';
+  studs = r[1].filter(function (s) { return s.classId === course.classId; }); studs.forEach(function (s) { if (s.courseCodes.indexOf(course.code) >= 0) sel.add(s.id); }); draw(); });
+AT.$('#q').oninput = draw;
+AT.$('#all').onclick = function () { studs.forEach(function (s) { sel.add(s.id); }); draw(); };
+AT.$('#none').onclick = function () { sel.clear(); draw(); };
+document.addEventListener('change', function (e) { const c = e.target.closest('[data-s]'); if (!c) return; const id = Number(c.dataset.s); c.checked ? sel.add(id) : sel.delete(id); AT.$('#cnt').textContent = sel.size + ' of ' + studs.length + ' enrolled'; });
+AT.$('#save').onclick = function () { Promise.all(studs.map(function (s) {
+  return AT.api.student(s.id).then(function (d) { const cur = d.student.enrolled.filter(function (x) { return x !== course.id; }); if (sel.has(s.id)) cur.push(course.id); return AT.api.setEnrollment(s.id, cur); }); })).then(function () { AT.toast('Enrolment saved (' + sel.size + ' students)'); }); };
+</script>
+</body>
+</html>
