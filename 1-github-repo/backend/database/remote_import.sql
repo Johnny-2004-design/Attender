@@ -1,39 +1,22 @@
 -- =============================================================================
--- ATTENDER — remote shared-host import (InfinityFree / similar)
+-- ATTENDER - shared-host import (InfinityFree phpMyAdmin / MariaDB)
 -- =============================================================================
--- Import inside the database created by the hosting panel (phpMyAdmin → select DB).
--- Do NOT run CREATE DATABASE (panel user usually cannot).
+-- How to use:
+--   1. InfinityFree panel -> MySQL Databases -> create a database.
+--   2. phpMyAdmin -> click that database in the left tree (selects it).
+--   3. Import tab -> choose this file -> Go.
 --
--- Before import: replace YOUR_PANEL_DB_NAME below with the exact database name
--- from the control panel (example: if0_XXXXXXXX_attender).
--- Or: select the DB in phpMyAdmin first and comment out the USE line.
---
--- Safe: CREATE TABLE IF NOT EXISTS only. No seed rows. No DROP.
--- Optional demo lecturers: database/remote_seed_lecturers.sql
--- XAMPP users: prefer database/attender_full.sql instead of this file.
--- =============================================================================
-
-SET NAMES utf8mb4;
-SET time_zone = '+00:00';
-
-USE YOUR_PANEL_DB_NAME;
-
-SET FOREIGN_KEY_CHECKS = 0;
-
-CREATE TABLE IF NOT EXISTS     (does NOT wipe existing tables/data)
---   * No seed/demo rows in this file
---   * Destructive DROP block is COMMENTED OUT at the bottom (lab wipe only)
---
--- After import (optional demo data):
---   php database/seed.php
---
--- Existing DBs missing face columns only: also see
---   database/migrations/20261117_face_embedding_ready.sql
+-- Notes:
+--   * No CREATE DATABASE / USE: phpMyAdmin has already selected the target database.
+--   * Only CREATE TABLE IF NOT EXISTS: safe to re-run, never drops or wipes data.
+--   * No seed rows. Create the first lecturer from the app's Register page.
+--   * Includes face + verification structures (facial_templates, verification_attempts,
+--     embedding_ready, face_enrolled). The migration in database/migrations/ is only
+--     for databases created from an older schema.
 -- =============================================================================
 
 SET NAMES utf8mb4;
 SET time_zone = '+00:00';
-
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- ---------------------------------------------------------------------------
@@ -351,32 +334,3 @@ CREATE TABLE IF NOT EXISTS system_settings (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;
-
--- =============================================================================
--- OPTIONAL lab wipe ONLY — keep commented for production / real data.
--- Uncomment the block below ONLY when you intentionally want an empty schema.
--- =============================================================================
-/*
-SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE IF EXISTS verification_attempts;
-DROP TABLE IF EXISTS attendance_records;
-DROP TABLE IF EXISTS attendance_codes;
-DROP TABLE IF EXISTS attendance_tokens;
-DROP TABLE IF EXISTS attendance_sessions;
-DROP TABLE IF EXISTS facial_templates;
-DROP TABLE IF EXISTS course_enrollments;
-DROP TABLE IF EXISTS student_registrations;
-DROP TABLE IF EXISTS class_invitations;
-DROP TABLE IF EXISTS classroom_locations;
-DROP TABLE IF EXISTS courses;
-DROP TABLE IF EXISTS lecturer_classes;
-DROP TABLE IF EXISTS notifications;
-DROP TABLE IF EXISTS audit_logs;
-DROP TABLE IF EXISTS system_settings;
-DROP TABLE IF EXISTS students;
-DROP TABLE IF EXISTS lecturers;
-SET FOREIGN_KEY_CHECKS = 1;
--- Then re-run the CREATE TABLE statements above, or re-import this file.
-*/
-
-SELECT 'ATTENDER schema ready (attender_full.sql). Optional next: php database/seed.php' AS message;
