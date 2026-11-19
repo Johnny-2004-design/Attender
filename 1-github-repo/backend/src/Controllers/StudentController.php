@@ -266,6 +266,7 @@ final class StudentController
         $lecturer = Database::fetch('SELECT id, name, title, department, institution FROM lecturers WHERE id = ?', [(int) $inv['lecturer_id']]);
         json_response([
             'valid' => $valid,
+            'faceMode' => FaceService::make()->providerName(),
             'token' => $inv['token'],
             'class' => $class ? [
                 'id' => (int) $class['id'],
@@ -335,21 +336,28 @@ final class StudentController
         }
 
         $images = $body['faceImages'] ?? [];
-        if (!is_array($images) || count($images) < 1) {
+        $descriptors = $body['faceDescriptors'] ?? [];
+        if (!is_array($images)) {
+            $images = [];
+        }
+        if (!is_array($descriptors)) {
+            $descriptors = [];
+        }
+        if (count($images) < 1 && count($descriptors) < 1) {
             json_error('Face capture is required. Take the enrolment photos and try again.');
             return;
         }
 
         $face = FaceService::make();
         // http/onnx always require a real embedding; null never claims enrollment success.
-        $requireEmbedding = FaceService::requiresEmbedding() || in_array($face->providerName(), ['http', 'onnx'], true);
+        $requireEmbedding = FaceService::requiresEmbedding() || in_array($face->providerName(), ['http', 'onnx', 'browser'], true);
         $status = !empty($inv['auto_approve']) ? 'approved' : 'pending';
         $faceEnrolled = false;
         $enrollReason = null;
 
         Database::begin();
         try {
-            $enroll = $face->enroll($studentId, $lecturerId, $images);
+            $enroll = $face->enroll($studentId, $lecturerId, $images, ['descriptors' => $descriptors]);
             $faceEnrolled = !empty($enroll['face_enrolled']) && !empty($enroll['ok']);
             $enrollReason = $enroll['reason'] ?? null;
 
@@ -398,6 +406,72 @@ final class StudentController
             'face_enrolled' => $faceEnrolled,
             'face_reason' => $faceEnrolled ? null : ($enrollReason ?? 'Face embedding not created.'),
         ]);
+    }
+
+    /**
+     * Student self-service face enrolment for someone who is ALREADY registered but has no usable
+     * face on file (e.g. registered before the browser face engine existed).
+     * Proof of identity: index number + the phone number given at registration.
+     * Refused when a face is already on file: the lecturer must delete it first, so nobody can
+     * overwrite another student's face.
+     */
+    public static function enrolFace(): void
+    {
+        \Attender\Support\Session::start();
+        CsrfMiddleware::requireValid();
+        $body = request_json();
+        $index = strtoupper(trim((string) ($body['index'] ?? '')));
+        $phone = preg_replace('/\D+/', '', (string) ($body['phone'] ?? '')) ?? '';
+        $ip = \Attender\Support\client_ip();
+
+        // Throttle guessing: 10 failed tries per IP per 10 minutes.
+        $recent = (int) (Database::fetch(
+            "SELECT COUNT(*) c FROM verification_attempts
+             WHERE stage = 'enrol' AND outcome = 'fail' AND ip_address = ? AND created_at > ?",
+            [$ip, date('Y-m-d H:i:s', time() - 600)]
+        )['c'] ?? 0);
+        if ($recent >= 10) {
+            json_error('Too many attempts. Wait 10 minutes and try again.', 429);
+            return;
+        }
+        $fail = static function (string $reason, ?int $studentId = null) use ($ip): void {
+            Database::insert(
+                "INSERT INTO verification_attempts (student_id, stage, outcome, reason, ip_address, user_agent, created_at)
+                 VALUES (?, 'enrol', 'fail', ?, ?, ?, ?)",
+                [$studentId, $reason, $ip, \Attender\Support\user_agent(), now_sql()]
+            );
+            json_error($reason, 422);
+        };
+
+        $student = $index !== '' ? Database::fetch('SELECT * FROM students WHERE index_number = ? LIMIT 1', [$index]) : null;
+        $stored = $student ? (preg_replace('/\D+/', '', (string) ($student['phone'] ?? '')) ?? '') : '';
+        if (!$student || strlen($phone) < 9 || strlen($stored) < 9 || substr($phone, -9) !== substr($stored, -9)) {
+            $fail('Index number and phone number do not match a registration.');
+            return;
+        }
+        $studentId = (int) $student['id'];
+        $regs = Database::fetchAll(
+            "SELECT id, lecturer_id FROM student_registrations WHERE student_id = ? AND status <> 'rejected' ORDER BY id",
+            [$studentId]
+        );
+        if (!$regs) {
+            $fail('You are not registered for any class yet. Use your lecturer\'s registration link first.', $studentId);
+            return;
+        }
+        $face = FaceService::make();
+        if ($face->hasReadyEmbedding($studentId)) {
+            $fail('A face is already on file for you. Ask your lecturer to delete it (Students page), then enrol again.', $studentId);
+            return;
+        }
+        $descriptors = $body['faceDescriptors'] ?? [];
+        $enroll = $face->enroll($studentId, (int) $regs[0]['lecturer_id'], [], ['descriptors' => is_array($descriptors) ? $descriptors : []]);
+        if (empty($enroll['ok']) || empty($enroll['face_enrolled'])) {
+            $fail((string) ($enroll['reason'] ?? 'Face enrolment failed. Try again.'), $studentId);
+            return;
+        }
+        Database::exec('UPDATE student_registrations SET face_enrolled = 1 WHERE student_id = ?', [$studentId]);
+        AuditService::log(null, 'face.enrol.self', 'Student enrolled face', '', 'student', $studentId, null, ['face_enrolled' => true], 'student', $studentId, (string) $student['full_name']);
+        json_response(['ok' => true, 'face_enrolled' => true, 'name' => $student['full_name']]);
     }
 
     /**

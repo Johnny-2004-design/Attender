@@ -17,6 +17,11 @@ final class GeoService
         return 2 * $R * asin(min(1.0, sqrt($a)));
     }
 
+    private static function fmt(float $m): string
+    {
+        return number_format($m, 0, '.', '');
+    }
+
     public static function withinRadius(
         float $lat1,
         float $lng1,
@@ -28,17 +33,20 @@ final class GeoService
     ): array {
         $distance = self::distanceMeters($lat1, $lng1, $lat2, $lng2);
         if ($maxAccuracyM !== null && $accuracyM !== null && $accuracyM > $maxAccuracyM) {
+            // A reading this vague (laptop / IP-based guess) says nothing about where the student is.
             return [
                 'ok' => false,
                 'distance' => round($distance, 2),
-                'reason' => 'GPS accuracy too low.',
+                'reason' => 'GPS accuracy too low (±' . self::fmt($accuracyM) . ' m, need ±' . self::fmt($maxAccuracyM)
+                    . ' m or better). Use a phone with GPS switched on.',
             ];
         }
         if ($distance > $radiusM) {
             return [
                 'ok' => false,
                 'distance' => round($distance, 2),
-                'reason' => 'Outside classroom radius.',
+                'reason' => 'Outside classroom radius (you are ' . self::fmt($distance) . ' m away, allowed '
+                    . self::fmt($radiusM) . ' m).',
             ];
         }
         return ['ok' => true, 'distance' => round($distance, 2), 'reason' => null];

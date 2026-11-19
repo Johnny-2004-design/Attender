@@ -30,7 +30,7 @@ return [
     'ATTENDER_ALLOWED_ORIGINS' => 'https://YOUR-SITE.netlify.app',
 
     // Presentation default: no Python face-service on shared PHP hosts.
-    'ATTENDER_FACE_PROVIDER' => 'null',
+    'ATTENDER_FACE_PROVIDER' => 'browser', // 'browser' = in-browser face-api.js + PHP matching (works on free hosting); 'null' = face checks always fail
     'ATTENDER_FACE_API_URL' => '',
     'ATTENDER_FACE_API_KEY' => '',
     'ATTENDER_FACE_REQUIRE_EMBEDDING' => '0',

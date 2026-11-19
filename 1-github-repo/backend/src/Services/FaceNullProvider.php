@@ -33,7 +33,7 @@ final class FaceNullProvider implements FaceServiceInterface
         return $row !== null;
     }
 
-    public function enroll(int $studentId, ?int $lecturerId, array $imageDataUrls): array
+    public function enroll(int $studentId, ?int $lecturerId, array $imageDataUrls, array $extra = []): array
     {
         if (count($imageDataUrls) < 1) {
             return [

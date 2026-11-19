@@ -65,9 +65,28 @@ final class VerificationEngine
     {
         $input = (string) ($payload['input'] ?? '');
         $index = strtoupper(trim((string) ($payload['index'] ?? '')));
+        $isCodeInput = !(str_contains($input, 't=') || strlen($input) > 12);
+        $inputType = $isCodeInput ? 'code' : 'qr';
+
+        // "Max code attempts per student" (Settings): too many wrong codes in the code's lifetime → locked out.
+        $knownStudent = $index !== '' ? Database::fetch('SELECT id FROM students WHERE index_number = ? LIMIT 1', [$index]) : null;
+        if ($isCodeInput && $knownStudent) {
+            $limit = $this->codeAttemptLimit((int) $knownStudent['id']);
+            $window = date('Y-m-d H:i:s', time() - ((int) (config('security')['code_ttl_minutes'] ?? 10)) * 60);
+            $wrong = (int) (Database::fetch(
+                "SELECT COUNT(*) c FROM verification_attempts
+                 WHERE student_id = ? AND input_type = 'code' AND stage = 'session' AND outcome = 'fail'
+                   AND reason = 'Invalid attendance code.' AND created_at > ?",
+                [(int) $knownStudent['id'], $window]
+            )['c'] ?? 0);
+            if ($wrong >= $limit) {
+                return ['ok' => false, 'reason' => 'Too many wrong codes. Ask your lecturer for a new code, then try again in a few minutes.'];
+            }
+        }
+
         $resolved = $this->resolveInput($input);
         if (!$resolved['ok']) {
-            $this->attempt(null, null, null, str_contains($input, 't=') || strlen($input) > 12 ? 'qr' : 'code', 'session', 'fail', $resolved['reason']);
+            $this->attempt(null, $knownStudent ? (int) $knownStudent['id'] : null, null, $inputType, 'session', 'fail', $resolved['reason']);
             return $resolved;
         }
 
@@ -123,7 +142,7 @@ final class VerificationEngine
                 $this->attempt($sessionId, $studentId, $lecturerId, $method, 'gps', 'fail', 'Location could not be verified.');
                 return ['ok' => false, 'reason' => 'Location could not be verified.'];
             }
-            $settings = $this->lecturerSettings($lecturerId);
+            $settings = SettingsService::get($lecturerId);
             $geo = GeoService::withinRadius(
                 (float) $session['latitude'],
                 (float) $session['longitude'],
@@ -155,7 +174,14 @@ final class VerificationEngine
                 return ['ok' => false, 'reason' => $reason];
             }
             $images = $payload['faceImages'] ?? $payload['images'] ?? [];
-            if (!is_array($images) || !$images) {
+            $descriptors = $payload['faceDescriptors'] ?? [];
+            if (!is_array($images)) {
+                $images = [];
+            }
+            if (!is_array($descriptors)) {
+                $descriptors = [];
+            }
+            if (!$images && !$descriptors) {
                 $reason = 'Face capture required for this session.';
                 $this->attempt($sessionId, $studentId, $lecturerId, $method, 'face', 'fail', $reason);
                 return ['ok' => false, 'reason' => $reason];
@@ -164,11 +190,19 @@ final class VerificationEngine
                 'challenge' => $payload['livenessChallenge'] ?? null,
                 'frames' => $payload['livenessFrames'] ?? [],
                 'lecturer_id' => $lecturerId,
+                // browser face engine: descriptors + the result of the on-screen challenge
+                'descriptors' => $descriptors,
+                'client' => [
+                    'challenge' => $payload['livenessChallenge'] ?? null,
+                    'passed' => ($payload['livenessPassed'] ?? null) === true,
+                ],
             ];
             $face = $faceSvc->verify($studentId, $images, $liveness);
             $unavailablePolicy = (string) (config('app')['face_unavailable_policy'] ?? 'pending');
             $livenessRequired = (bool) (config('app')['face_require_liveness'] ?? true);
-            $threshold = (float) (config('app')['face_match_threshold'] ?? 0.80);
+            // The lecturer's Settings slider is the live policy; the env value is only a fallback.
+            $threshold = (float) (SettingsService::get($lecturerId)['faceThreshold']
+                ?? (config('app')['face_match_threshold'] ?? 0.80));
 
             // Fail-closed: invalid / incomplete face payloads NEVER become PRESENT/LATE.
             if (!empty($face['pending']) || empty($face['ok'])) {
@@ -263,6 +297,21 @@ final class VerificationEngine
         ];
     }
 
+    /** Strictest "max code attempts" among the lecturers this student is registered with (default 5). */
+    private function codeAttemptLimit(int $studentId): int
+    {
+        $rows = Database::fetchAll(
+            "SELECT DISTINCT lecturer_id FROM student_registrations WHERE student_id = ? AND status = 'approved'",
+            [$studentId]
+        );
+        $limit = null;
+        foreach ($rows as $r) {
+            $v = (int) (SettingsService::get((int) $r['lecturer_id'])['maxCodeAttempts'] ?? 5);
+            $limit = $limit === null ? $v : min($limit, $v);
+        }
+        return max(1, $limit ?? 5);
+    }
+
     private function sessionPayload(int $sessionId, string $method): array
     {
         $session = Database::fetch('SELECT * FROM attendance_sessions WHERE id = ?', [$sessionId]);
@@ -276,22 +325,11 @@ final class VerificationEngine
             'session' => $session,
             'course' => $course,
             'radius' => (int) $session['radius_m'],
+            'faceMode' => FaceService::make()->providerName(),
+            'minAccuracy' => (int) (SettingsService::get((int) $session['lecturer_id'])['minAccuracy'] ?? 50),
             'gps' => (int) $session['require_gps'] === 1,
             'face' => (int) $session['require_face'] === 1,
         ];
-    }
-
-    private function lecturerSettings(int $lecturerId): array
-    {
-        $rows = Database::fetchAll(
-            'SELECT setting_key, setting_value FROM system_settings WHERE lecturer_id = ?',
-            [$lecturerId]
-        );
-        $out = [];
-        foreach ($rows as $r) {
-            $out[$r['setting_key']] = json_decode((string) $r['setting_value'], true) ?? $r['setting_value'];
-        }
-        return $out;
     }
 
     private function upsertFailedRecord(

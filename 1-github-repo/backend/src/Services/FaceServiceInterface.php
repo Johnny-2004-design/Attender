@@ -16,6 +16,7 @@ interface FaceServiceInterface
 {
     /**
      * @param list<string> $imageDataUrls base64 data URLs from client capture
+     * @param array{descriptors?:list<list<float>>} $extra provider-specific data (browser provider: face descriptors)
      * @return array{
      *   ok:bool,
      *   face_enrolled:bool,
@@ -25,7 +26,7 @@ interface FaceServiceInterface
      *   provider:string
      * }
      */
-    public function enroll(int $studentId, ?int $lecturerId, array $imageDataUrls): array;
+    public function enroll(int $studentId, ?int $lecturerId, array $imageDataUrls, array $extra = []): array;
 
     /**
      * @param list<string> $imageDataUrls

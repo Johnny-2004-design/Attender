@@ -12,6 +12,7 @@ final class FaceService
         $provider = strtolower((string) (config('app')['face_provider'] ?? 'null'));
         return match ($provider) {
             'http', 'onnx' => new FaceHttpProvider(),
+            'browser' => new FaceBrowserProvider(),
             default => new FaceNullProvider(),
         };
     }
@@ -20,7 +21,7 @@ final class FaceService
     public static function requiresEmbedding(): bool
     {
         $provider = strtolower((string) (config('app')['face_provider'] ?? 'null'));
-        if (in_array($provider, ['http', 'onnx'], true)) {
+        if (in_array($provider, ['http', 'onnx', 'browser'], true)) {
             return true;
         }
         return (bool) (config('app')['face_require_embedding'] ?? false);

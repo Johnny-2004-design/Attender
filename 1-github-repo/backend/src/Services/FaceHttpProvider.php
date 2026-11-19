@@ -44,7 +44,7 @@ final class FaceHttpProvider implements FaceServiceInterface
         return $this->audit->hasReadyEmbedding($studentId);
     }
 
-    public function enroll(int $studentId, ?int $lecturerId, array $imageDataUrls): array
+    public function enroll(int $studentId, ?int $lecturerId, array $imageDataUrls, array $extra = []): array
     {
         if (!$this->isConfigured()) {
             $key = config('app')['face_api_key'] ?? '';

@@ -105,6 +105,7 @@ final class SessionController
             return;
         }
 
+        try { \Attender\Services\FaceRetention::purge($lid); } catch (\Throwable $e) { error_log('[ATTENDER] retention: ' . $e->getMessage()); }
         $course = Database::fetch('SELECT * FROM courses WHERE id = ?', [$courseId]);
         $settings = SettingsService::get($lid);
         $eligible = (int) (Database::fetch(
@@ -116,7 +117,7 @@ final class SessionController
         if (!in_array($method, ['qr', 'code', 'both'], true)) {
             $method = 'qr';
         }
-        $radius = (int) ($body['radius'] ?? $settings['defaultRadius']);
+        $radius = max(10, min(500, (int) ($body['radius'] ?? $settings['defaultRadius'])));
         $lateAfter = (int) ($body['lateAfter'] ?? 10);
         $duration = isset($body['duration']) ? (int) $body['duration'] : null;
         $qrMode = (string) ($body['qrMode'] ?? 'rotate');
@@ -126,6 +127,11 @@ final class SessionController
         $qrMinutes = (int) ($body['qrMinutes'] ?? 5);
         $gps = array_key_exists('gps', $body) ? (bool) $body['gps'] : (bool) $settings['requireGps'];
         $face = array_key_exists('face', $body) ? (bool) $body['face'] : (bool) $settings['requireFace'];
+        // Policy is enforced here, not just greyed out in the browser: face can only be switched
+        // off for a session when the lecturer ticked "Allow me to turn face verification off".
+        if (!$face && empty($settings['allowDisableFace'])) {
+            $face = true;
+        }
         $location = trim((string) ($body['location'] ?? $settings['locName'] ?? ''));
         $lat = isset($body['lat']) ? (float) $body['lat'] : (float) $settings['lat'];
         $lng = isset($body['lng']) ? (float) $body['lng'] : (float) $settings['lng'];
@@ -144,7 +150,7 @@ final class SessionController
         );
 
         $tok = QrTokenService::issue($id, $qrMode === 'rotate' ? (int) ($settings['qrRotateSeconds'] ?? 30) : max(60, $qrMinutes * 60));
-        $code = CodeService::issue($id);
+        $code = CodeService::issue($id, null, (int) ($settings['maxCodeAttempts'] ?? 5));
 
         AuditService::log($lid, 'Session opened', $course['code'], '', 'attendance_session', $id, null, null, 'lecturer', $lid, $lec['name']);
 
@@ -174,7 +180,7 @@ final class SessionController
             json_error('No open session.', 404);
             return;
         }
-        CodeService::issue((int) $active['id']);
+        CodeService::issue((int) $active['id'], null, (int) (SettingsService::get((int) $lec['id'])['maxCodeAttempts'] ?? 5));
         json_response(DashboardController::activeSessionPayload((int) $lec['id']));
     }
 

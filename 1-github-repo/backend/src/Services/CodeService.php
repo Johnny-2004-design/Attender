@@ -11,7 +11,7 @@ use function Attender\Support\random_code;
 
 final class CodeService
 {
-    public static function issue(int $sessionId, ?int $ttlMinutes = null): array
+    public static function issue(int $sessionId, ?int $ttlMinutes = null, ?int $attemptLimit = null): array
     {
         $sec = config('security');
         $ttl = $ttlMinutes ?? (int) $sec['code_ttl_minutes'];
@@ -26,7 +26,7 @@ final class CodeService
         $id = Database::insert(
             'INSERT INTO attendance_codes (session_id, code_hash, code_plain, expires_at, attempt_limit, is_active, created_at)
              VALUES (?, ?, ?, ?, ?, 1, ?)',
-            [$sessionId, $hash, $plain, $expires, (int) $sec['max_code_attempts'], now_sql()]
+            [$sessionId, $hash, $plain, $expires, $attemptLimit ?? (int) $sec['max_code_attempts'], now_sql()]
         );
         return ['id' => $id, 'code' => $plain, 'expires_at' => $expires];
     }

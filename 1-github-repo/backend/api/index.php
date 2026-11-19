@@ -71,6 +71,7 @@ $routes = [
     'POST requests/decide' => [StudentController::class, 'decideRequest'],
     'GET invite' => [StudentController::class, 'inviteInfo'],
     'POST registration' => [StudentController::class, 'submitRegistration'],
+    'POST registration/face' => [StudentController::class, 'enrolFace'],
     'POST students/face/delete' => [StudentController::class, 'deleteFace'],
     'GET sessions' => [SessionController::class, 'list'],
     'GET session' => [SessionController::class, 'one'],

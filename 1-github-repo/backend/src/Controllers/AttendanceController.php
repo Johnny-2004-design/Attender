@@ -26,6 +26,8 @@ final class AttendanceController
             'ok' => true,
             'course' => $res['course'],
             'radius' => $res['radius'],
+            'minAccuracy' => $res['minAccuracy'],
+            'faceMode' => $res['faceMode'],
             'gps' => $res['gps'],
             'face' => $res['face'],
             'csrf' => Csrf::token(),

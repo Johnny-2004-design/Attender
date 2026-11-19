@@ -23,7 +23,9 @@ final class SettingsController
         $lec = AuthMiddleware::requireLecturer();
         CsrfMiddleware::requireValid();
         $body = request_json();
-        json_response(SettingsService::save((int) $lec['id'], $body));
+        $saved = SettingsService::save((int) $lec['id'], $body);
+        try { \Attender\Services\FaceRetention::purge((int) $lec['id']); } catch (\Throwable $e) { error_log('[ATTENDER] retention: ' . $e->getMessage()); }
+        json_response($saved);
     }
 
     public static function export(): void
