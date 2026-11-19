@@ -62,7 +62,7 @@
 
   AT.$('#cap').onclick = function () { const b = this, err = AT.$('#e2'); err.classList.add('d-none'); b.disabled = true; b.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Checking…';
     AT.face.describe(AT.$('#v'), { prompt: function (t) { AT.$('#prompt').textContent = t; }, good: function (g) { AT.$('#oval').classList.toggle('good', g); } }).then(function (r) {
-      descs.push(r.descriptor); shots.push(S.snapshot(AT.$('#v'), 160));
+      AT.face.assertSamePerson(descs, r.descriptor); descs.push(r.descriptor); shots.push(S.snapshot(AT.$('#v'), 160));
       AT.$('#shots').innerHTML = shots.map(function (s) { return '<img src="' + s + '" class="rounded-3" style="width:30%;aspect-ratio:3/4;object-fit:cover;transform:scaleX(-1)" alt="">'; }).join('');
       if (descs.length < 3) { b.disabled = false; b.textContent = 'Capture (' + (descs.length + 1) + ' of 3)'; AT.$('#prompt').textContent = prompts[descs.length]; return; }
       b.textContent = 'Saving…'; S.stopCamera(stream);

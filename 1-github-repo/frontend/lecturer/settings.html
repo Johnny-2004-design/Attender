@@ -55,15 +55,25 @@ function put() { AT.$('#gps').checked = S.requireGps !== false; AT.$('#rad').val
 AT.api.settings().then(function (s) { S = s; put(); });
 AT.$('#th').oninput = function () { AT.$('#thv').textContent = Math.round(this.value * 100) + '%'; };
 function showCoords() { AT.$('#coords').textContent = S && S.lat ? S.lat.toFixed(5) + ', ' + S.lng.toFixed(5) : 'Not set'; }
+// Watches the location for up to 15 s and keeps the most accurate fix (the first reading is often the worst).
+function bestFix(onTick) { return new Promise(function (res, rej) {
+  let best = null, id, done = false, err = null, t;
+  const finish = function () { if (done) return; done = true; navigator.geolocation.clearWatch(id); clearTimeout(t); best ? res(best) : rej(err || new Error('No location')); };
+  t = setTimeout(finish, 15000);
+  id = navigator.geolocation.watchPosition(function (p) { const a = Math.round(p.coords.accuracy); if (!best || a < best.acc) best = { lat: p.coords.latitude, lng: p.coords.longitude, acc: a }; onTick(best); if (best.acc <= 25) finish(); },
+    function (e) { err = e; if (e.code === 1) finish(); }, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+}); }
+const FIX_MAX = 250;
+function fixAdvice(acc, radius) { return acc <= 50 ? 'Classroom location set (±' + acc + ' m).' : 'Location set, but only accurate to ±' + acc + ' m (typical for a laptop). ' + (radius && radius < acc ? 'Your radius (' + radius + ' m) is smaller than that — use a radius of at least ' + acc + ' m, or ' : '') + 'for a precise point, repeat this on your phone.'; }
 AT.$('#here').onclick = function () {
   if (!navigator.geolocation) return AT.toast('No location support in this browser.', 'error');
   AT.$('#coords').textContent = 'Locating…';
-  navigator.geolocation.getCurrentPosition(function (p) {
-    const acc = Math.round(p.coords.accuracy);
-    if (acc > 100) { showCoords(); return AT.toast('That reading is only accurate to ±' + acc + ' m (laptops guess from Wi-Fi/IP). It was NOT saved. Use your phone, or paste coordinates from Google Maps.', 'error'); }
-    S.lat = p.coords.latitude; S.lng = p.coords.longitude;
-    AT.$('#coords').textContent = S.lat.toFixed(5) + ', ' + S.lng.toFixed(5) + ' (±' + acc + ' m) — press Save settings';
-  }, function () { showCoords(); AT.toast('Location permission was denied or unavailable.', 'error'); }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+  bestFix(function (f) { AT.$('#coords').textContent = 'Improving accuracy… ±' + f.acc + ' m'; }).then(function (f) {
+    if (f.acc > FIX_MAX) { showCoords(); return AT.toast('That reading is only accurate to ±' + f.acc + ' m, too rough to use. It was NOT saved. Try near a window / outdoors, use your phone, or paste coordinates from Google Maps.', 'error'); }
+    S.lat = f.lat; S.lng = f.lng;
+    AT.$('#coords').textContent = S.lat.toFixed(5) + ', ' + S.lng.toFixed(5) + ' (±' + f.acc + ' m) — press Save settings';
+    AT.toast(fixAdvice(f.acc, Number(AT.$('#rad').value)), f.acc <= 50 ? undefined : 'error');
+  }).catch(function (e) { showCoords(); AT.toast(e && e.code === 1 ? 'Location permission was denied. Allow it in the browser address bar and try again.' : 'Could not get your location.', 'error'); });
 };
 AT.$('#pasteBtn').onclick = function () {
   const m = AT.$('#paste').value.match(/(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)/);

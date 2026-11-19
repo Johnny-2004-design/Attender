@@ -196,6 +196,9 @@
         return req('attendance/resolve', { method: 'POST', body: { input: input } });
       });
     },
+    checkFace: function (p) {
+      return AT.ensureCsrf().then(function () { return req('attendance/face-check', { method: 'POST', body: p }); });
+    },
     submitAttendance: function (p) {
       return AT.ensureCsrf().then(function () {
         return req('attendance/submit', { method: 'POST', body: p });

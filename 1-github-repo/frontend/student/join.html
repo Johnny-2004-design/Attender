@@ -111,7 +111,7 @@
       sendRegistration(btn); };
     if (browserFace()) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Checking…';
       AT.face.describe(AT.$('#v'), { prompt: function (t) { AT.$('#prompt').textContent = t; }, good: function (g) { AT.$('#oval').classList.toggle('good', g); } })
-        .then(function (r) { descs.push(r.descriptor); shots.push(S.snapshot(AT.$('#v'), 160)); done(); })   // thumbnail stays on this phone
+        .then(function (r) { AT.face.assertSamePerson(descs, r.descriptor); descs.push(r.descriptor); shots.push(S.snapshot(AT.$('#v'), 160)); done(); })   // thumbnail stays on this phone
         .catch(function (e) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-camera me-2"></i>Capture (' + (shots.length + 1) + ' of 3)'; err.textContent = e.message; err.classList.remove('d-none'); });
       return; }
     shots.push(S.snapshot(AT.$('#v'), 480)); done(); };

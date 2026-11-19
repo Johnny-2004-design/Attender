@@ -112,11 +112,22 @@
     let challenge = null;
     if (s.face) { stepBar(2); row('r-face', 'running', 'Starting camera…');
       try {
-        if (s.faceMode === 'browser') { const live = await browserLiveness(); descriptors = live.descriptors; challenge = live.challenge; passed = live.passed;
-          if (!passed) { const m = 'We did not see you follow the instruction (' + AT.face.CHALLENGES[challenge].toLowerCase() + '). Try again and do it clearly, facing the camera in good light.'; row('r-face', 'fail', 'Instruction not completed'); return fail(m); } }
-        else { const live = await liveness(); frames = live.frames; challenge = live.challenge; }
-      } catch (e) { row('r-face', 'fail', S.cameraError(e)); return fail(S.cameraError(e)); }
-      row('r-face', 'ok', 'Face captured and sent for verification'); } else { row('r-face', 'ok', 'Not required for this session'); }
+        if (s.faceMode === 'browser') {
+          // (a) is there a registered face at all? Stop here, before the camera opens, if not.
+          row('r-face', 'running', 'Checking your registered face…');
+          const pre = await AT.api.checkFace({ input: input, index: idx });
+          if (!pre.ok) { row('r-face', 'fail', pre.notEnrolled ? 'Face enrollment incomplete' : pre.reason); return fail(pre.reason, !pre.notEnrolled && !/already|not approved|not found/i.test(pre.reason || '')); }
+          // (b) live capture + random action
+          const live = await browserLiveness(); descriptors = live.descriptors; challenge = live.challenge; passed = live.passed;
+          if (!passed) { const m = 'We did not see you follow the instruction (' + AT.face.CHALLENGES[challenge].toLowerCase() + '). Try again and do it clearly, facing the camera in good light.'; row('r-face', 'fail', 'Instruction not completed'); return fail(m); }
+          // (c) must MATCH the face taken at registration before we move on to the next step
+          row('r-face', 'running', 'Matching with your registered face…');
+          const chk = await AT.api.checkFace({ input: input, index: idx, faceDescriptors: descriptors, livenessChallenge: challenge, livenessPassed: passed });
+          if (!chk.ok || !chk.matched) { row('r-face', 'fail', 'Face does not match your registration'); return fail(chk.reason || 'Face did not match your registration.', !/too many/i.test(chk.reason || '')); }
+          row('r-face', 'ok', 'Face matches your registration');
+        } else { const live = await liveness(); frames = live.frames; challenge = live.challenge; row('r-face', 'ok', 'Face captured and sent for verification'); }
+      } catch (e) { row('r-face', 'fail', (e && e.data && e.data.reason) || S.cameraError(e)); return fail((e && e.data && e.data.reason) || S.cameraError(e)); }
+    } else { row('r-face', 'ok', 'Not required for this session'); }
     // 4. server verification engine
     stepBar(3); row('r-fin', 'running', 'Recording…'); await sleep(200);
     const r = await AT.api.submitAttendance({

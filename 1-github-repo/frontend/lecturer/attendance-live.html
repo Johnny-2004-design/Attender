@@ -127,11 +127,23 @@ function sync() { const o = AT.$('#s-course').selectedOptions[0]; AT.$('#s-elig'
 ['s-course', 's-rad', 's-gps', 's-qrmode'].forEach(function (i) { AT.$('#' + i).addEventListener('input', sync); }); document.querySelectorAll('[name=method]').forEach(function (e) { e.addEventListener('change', sync); });
 AT.$('#s-qrmode').addEventListener('change', function () { AT.$('#s-qrmin').value = this.value === 'live' ? 30 : 5; sync(); });
 document.querySelectorAll('[data-r]').forEach(function (b) { b.onclick = function () { AT.$('#s-rad').value = b.dataset.r; sync(); }; });
+// Watches the location for up to 15 s and keeps the most accurate fix (the first reading is often the worst).
+function bestFix(onTick) { return new Promise(function (res, rej) {
+  let best = null, id, done = false, err = null, t;
+  const finish = function () { if (done) return; done = true; navigator.geolocation.clearWatch(id); clearTimeout(t); best ? res(best) : rej(err || new Error('No location')); };
+  t = setTimeout(finish, 15000);
+  id = navigator.geolocation.watchPosition(function (p) { const a = Math.round(p.coords.accuracy); if (!best || a < best.acc) best = { lat: p.coords.latitude, lng: p.coords.longitude, acc: a }; onTick(best); if (best.acc <= 25) finish(); },
+    function (e) { err = e; if (e.code === 1) finish(); }, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+}); }
+const FIX_MAX = 250;
+function fixAdvice(acc, radius) { return acc <= 50 ? 'Classroom location set (±' + acc + ' m).' : 'Location set, but only accurate to ±' + acc + ' m (typical for a laptop). ' + (radius && radius < acc ? 'Your radius (' + radius + ' m) is smaller than that — use a radius of at least ' + acc + ' m, or ' : '') + 'for a precise point, repeat this on your phone.'; }
 AT.$('#locate').onclick = function () { if (!navigator.geolocation) return AT.toast('This browser has no location support.', 'error'); AT.$('#lstat').textContent = 'Locating…';
-  navigator.geolocation.getCurrentPosition(function (p) { const acc = Math.round(p.coords.accuracy);
-    if (acc > 100) { AT.$('#lstat').textContent = S.lat ? S.lat.toFixed(5) + ', ' + S.lng.toFixed(5) : 'Not set'; return AT.toast('That reading is only accurate to ±' + acc + ' m, so it was NOT saved. Laptops guess from Wi-Fi/IP — use your phone, or paste coordinates in Settings.', 'error'); }
-    S.lat = p.coords.latitude; S.lng = p.coords.longitude; S.acc = p.coords.accuracy; AT.api.saveSettings({ lat: S.lat, lng: S.lng }); AT.$('#lstat').textContent = S.lat.toFixed(5) + ', ' + S.lng.toFixed(5) + ' (±' + acc + ' m)'; AT.toast('Classroom location saved'); },
-    function (e) { AT.$('#lstat').textContent = 'Unavailable'; AT.toast(e.code === 1 ? 'Location permission denied. Allow it in your browser settings.' : 'Could not get your location.', 'error'); }, { enableHighAccuracy: true, timeout: 15000 }); };
+  const old = S.lat ? S.lat.toFixed(5) + ', ' + S.lng.toFixed(5) : 'Not set';
+  bestFix(function (f) { AT.$('#lstat').textContent = 'Improving accuracy… ±' + f.acc + ' m'; }).then(function (f) {
+    if (f.acc > FIX_MAX) { AT.$('#lstat').textContent = old; return AT.toast('That reading is only accurate to ±' + f.acc + ' m, too rough to use, so it was NOT saved. Try near a window / outdoors, use your phone, or paste coordinates in Settings.', 'error'); }
+    S.lat = f.lat; S.lng = f.lng; S.acc = f.acc; AT.api.saveSettings({ lat: S.lat, lng: S.lng }); AT.$('#lstat').textContent = S.lat.toFixed(5) + ', ' + S.lng.toFixed(5) + ' (±' + f.acc + ' m)';
+    AT.toast(fixAdvice(f.acc, Number(AT.$('#s-rad').value)), f.acc <= 50 ? undefined : 'error');
+  }).catch(function (e) { AT.$('#lstat').textContent = old; AT.toast(e && e.code === 1 ? 'Location permission denied. Allow it in your browser settings.' : 'Could not get your location.', 'error'); }); };
 AT.$('#sf').onsubmit = function (e) { e.preventDefault(); const gps = AT.$('#s-gps').checked;
   if (gps && !S.lat) return AT.toast('Set the classroom location first (Use my location).', 'error');
   const method = document.querySelector('[name=method]:checked').value, qrMode = AT.$('#s-qrmode').value;

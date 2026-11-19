@@ -58,7 +58,9 @@
       yaw: (pts[30].x - pts[0].x) / jawW,                      // ~0.5 facing the camera; >0.5 = user turned to THEIR left
       ear: (ear(pts, 36) + ear(pts, 42)) / 2,                  // eye aspect ratio, drops when eyes close
       mouth: dist(pts[48], pts[54]) / jawW,                    // mouth width relative to face width, grows when smiling
-      size: Math.max(box.width / size.w, box.height / size.h)  // how much of the frame the face fills
+      size: Math.max(box.width / size.w, box.height / size.h), // how much of the frame the face fills
+      cx: (box.x + box.width / 2) / size.w, cy: (box.y + box.height / 2) / size.h,
+      inside: box.x >= -0.02 * size.w && box.y >= -0.02 * size.h && box.x + box.width <= 1.02 * size.w && box.y + box.height <= 1.02 * size.h
     };
   };
 
@@ -84,6 +86,8 @@
       if (r.n > 1) last = 'More than one face is visible. Only you should be in front of the camera.';
       else if (r.n === 0) last = 'No face found. Put your face inside the oval, in good light.';
       else if (r.m.size < MIN_SIZE) last = 'Move a little closer to the camera.';
+      else if (!r.m.inside) last = 'Move back a little so your whole face is inside the oval.';
+      else if (Math.abs(r.m.cx - 0.5) > 0.22 || Math.abs(r.m.cy - 0.5) > 0.25) last = 'Center your face in the oval.';
       else if (!F.isFrontal(r.m, ui.maxYaw)) last = 'Look straight at the camera.';
       else {
         const one = await w.faceapi.detectSingleFace(media, opts()).withFaceLandmarks().withFaceDescriptor();
@@ -97,6 +101,15 @@
       await sleep(250);
     }
     throw fail(last);
+  };
+
+  /** Distance between two descriptors (0 = identical; > 0.6 = different people). */
+  F.distance = function (a, b) { let s = 0; for (let i = 0; i < a.length; i++) { const x = a[i] - b[i]; s += x * x; } return Math.sqrt(s); };
+  /** Registration captures must all be the same person — checked on the phone as each one is taken. */
+  F.assertSamePerson = function (prev, next) {
+    for (let i = 0; i < prev.length; i++) {
+      if (F.distance(prev[i], next) > 0.5) throw fail('This capture does not look like the same face as your earlier one. Only you should be in front of the camera, with the same lighting. Try this photo again.');
+    }
   };
 
   // ---- the random "are you really there" challenge ------------------------------------------
