@@ -297,6 +297,99 @@ final class VerificationEngine
         ];
     }
 
+    /**
+     * Face step of the scan page, run BEFORE attendance is submitted and WITHOUT recording anything.
+     *   no descriptors → "is this student's face enrolled?"  (so the page can stop before opening the camera)
+     *   descriptors    → identity + lecturer threshold + liveness decision (same rules as submit()).
+     * submit() re-checks everything, so this can never be used to skip verification.
+     * Only yes/no is returned (never a score), and repeated failures are throttled, so it cannot be
+     * used to hill-climb towards someone else's face data.
+     */
+    public function checkFace(array $payload): array
+    {
+        $input = (string) ($payload['input'] ?? '');
+        $index = strtoupper(trim((string) ($payload['index'] ?? '')));
+        $resolved = $this->resolveInput($input);
+        if (!$resolved['ok']) {
+            return $resolved;
+        }
+        $session = $resolved['session'];
+        $method = $resolved['method_used'];
+        $lecturerId = (int) $session['lecturer_id'];
+        $sessionId = (int) $session['id'];
+
+        $student = Database::fetch('SELECT * FROM students WHERE index_number = ? LIMIT 1', [$index]);
+        if (!$student) {
+            return ['ok' => false, 'reason' => 'Student not found.'];
+        }
+        $studentId = (int) $student['id'];
+        $reg = Database::fetch(
+            'SELECT status FROM student_registrations WHERE student_id = ? AND class_id = ? AND lecturer_id = ? LIMIT 1',
+            [$studentId, (int) $session['class_id'], $lecturerId]
+        );
+        if (!$reg || $reg['status'] !== 'approved') {
+            return ['ok' => false, 'reason' => 'Student not approved.'];
+        }
+        if ((int) $session['require_face'] !== 1) {
+            return ['ok' => true, 'enrolled' => true, 'matched' => true, 'faceRequired' => false];
+        }
+        $existing = Database::fetch(
+            'SELECT status FROM attendance_records WHERE session_id = ? AND student_id = ? LIMIT 1',
+            [$sessionId, $studentId]
+        );
+        if ($existing && in_array($existing['status'], ['present', 'late', 'pending', 'review'], true)) {
+            return ['ok' => false, 'reason' => 'Attendance already recorded.'];
+        }
+
+        $faceSvc = FaceService::make();
+        if (!$faceSvc->hasReadyEmbedding($studentId)) {
+            return ['ok' => false, 'notEnrolled' => true, 'reason' => 'Face enrollment incomplete. Re-enrol your face before marking attendance.'];
+        }
+        $descriptors = $payload['faceDescriptors'] ?? [];
+        if (!is_array($descriptors) || !$descriptors) {
+            return ['ok' => true, 'enrolled' => true, 'matched' => false, 'faceRequired' => true];
+        }
+
+        $recentFails = (int) (Database::fetch(
+            "SELECT COUNT(*) c FROM verification_attempts
+             WHERE student_id = ? AND stage = 'facecheck' AND outcome = 'fail' AND created_at > ?",
+            [$studentId, date('Y-m-d H:i:s', time() - 600)]
+        )['c'] ?? 0);
+        if ($recentFails >= 8) {
+            return ['ok' => false, 'reason' => 'Too many failed face checks. Wait a few minutes and try again.'];
+        }
+
+        $face = $faceSvc->verify($studentId, [], [
+            'descriptors' => $descriptors,
+            'lecturer_id' => $lecturerId,
+            'client' => [
+                'challenge' => $payload['livenessChallenge'] ?? null,
+                'passed' => ($payload['livenessPassed'] ?? null) === true,
+            ],
+        ]);
+        $threshold = (float) (SettingsService::get($lecturerId)['faceThreshold'] ?? (config('app')['face_match_threshold'] ?? 0.80));
+        $livenessRequired = (bool) (config('app')['face_require_liveness'] ?? true);
+
+        $reason = null;
+        if (empty($face['ok']) || !empty($face['pending'])) {
+            $reason = $face['reason'] ?? 'Facial verification failed.';
+        } elseif (($face['identity_ok'] ?? null) !== true) {
+            $reason = $face['reason'] ?? 'Face did not match your registration.';
+        } else {
+            $sim = FaceSimilarity::meetsThreshold($face['similarity'] ?? null, $threshold);
+            if (!$sim['ok']) {
+                $reason = 'Face did not match your registration.';
+            } elseif ($livenessRequired && ($face['liveness_ok'] ?? null) !== true) {
+                $reason = $face['reason'] ?? 'Liveness verification failed or missing.';
+            }
+        }
+        $this->attempt($sessionId, $studentId, $lecturerId, $method, 'facecheck', $reason === null ? 'pass' : 'fail', $reason);
+        if ($reason !== null) {
+            return ['ok' => false, 'reason' => $reason];
+        }
+        return ['ok' => true, 'enrolled' => true, 'matched' => true, 'faceRequired' => true];
+    }
+
     /** Strictest "max code attempts" among the lecturers this student is registered with (default 5). */
     private function codeAttemptLimit(int $studentId): int
     {

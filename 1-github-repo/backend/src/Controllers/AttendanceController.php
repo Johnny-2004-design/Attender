@@ -44,6 +44,14 @@ final class AttendanceController
         json_response($engine->submit($body));
     }
 
+    /** Face step check (enrolled? / matches?) — records nothing; submit() still verifies again. */
+    public static function faceCheck(): void
+    {
+        Session::start();
+        \Attender\Middleware\CsrfMiddleware::requireValid();
+        json_response((new VerificationEngine())->checkFace(request_json()));
+    }
+
     /** Flush offline queue items one-by-one (same verification rules). */
     public static function submitQueue(): void
     {

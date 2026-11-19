@@ -89,6 +89,7 @@ $routes = [
     'GET reports/export' => [SettingsController::class, 'export'],
     'POST attendance/resolve' => [AttendanceController::class, 'resolve'],
     'POST attendance/submit' => [AttendanceController::class, 'submit'],
+    'POST attendance/face-check' => [AttendanceController::class, 'faceCheck'],
     'POST attendance/queue' => [AttendanceController::class, 'submitQueue'],
 ];
 
