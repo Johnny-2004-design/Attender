@@ -1,3 +1,26 @@
+# Browser face matching + enforcement (Nov 2026)
+
+* **New** `backend/src/Services/FaceBrowserProvider.php`, provider `browser` (see `docs/FACE_BROWSER.md`); `FaceService`/interface accept it (`enroll(..., array $extra = [])`).
+* **New** `frontend/assets/js/face.js`, `frontend/assets/vendor/faceapi/` (face-api.js 1.7.15 + models), `frontend/student/face.html` (enrol / re-enrol), route `POST registration/face`.
+* `join.html` and `scan.html` use the browser engine when the server reports `faceMode: browser`; legacy photo flow kept for `http`/`null` providers.
+* **Max code attempts** now enforced (strictest value among the student's lecturers; locks wrong-code guessing for the code's lifetime) and stored on each code.
+* **Retention** now enforced by `Services/FaceRetention.php` (12 / 6 months, or when the student leaves the class).
+
+# Settings / GPS fixes (Nov 2026)
+
+| File | Change |
+|---|---|
+| `backend/src/Services/SettingsService.php` | `allowDisableFace` and `retention` are now real settings (they were silently dropped on save). Every value is validated and clamped (radius 10–500 m, accuracy 10–500 m, threshold 0.60–0.95, ...), both on save and on read. |
+| `backend/src/Services/VerificationEngine.php` | Uses the lecturer's face-threshold slider (was ignored; env value was always used). Min GPS accuracy read through `SettingsService`. `resolve` also returns `minAccuracy`. |
+| `backend/src/Services/GeoService.php` | Rejection messages now include the numbers (distance / accuracy) so a failure can be diagnosed. |
+| `backend/src/Controllers/SessionController.php` | Radius clamped to 10–500 m. Face check can only be turned off for a session when `allowDisableFace` is ticked (enforced server-side). |
+| `backend/src/Controllers/AttendanceController.php` | Passes `minAccuracy` to the student page. |
+| `frontend/lecturer/settings.html` | Range checks, error toast if saving fails, paste-coordinates box, refuses to save a laptop-grade (>100 m) location, accurate label for the accuracy limit. |
+| `frontend/lecturer/attendance-live.html` | Radius slider allows up to 500 m (it stopped at 200, so a saved 5000 became 200); same location guard; error toast if opening fails. |
+| `frontend/student/scan.html` | Stops early with a plain explanation when the device's GPS reading is too imprecise, before face capture. |
+
+Known, not changed: `maxCodeAttempts` and `retention` are stored but not enforced anywhere yet; face matching needs a real face engine (see `docs/FACE_INTEGRATION.md`).
+
 # What changed vs. the uploaded project
 
 ## Added / modified (minimal, behaviour-preserving)
