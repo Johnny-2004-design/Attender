@@ -1,3 +1,9 @@
+# Face step validates before continuing; location fix (Nov 2026)
+
+* `VerificationEngine::checkFace` + route `POST attendance/face-check`: the scan page's Face step first checks the student HAS a registered face (stops before the camera opens with "Face enrollment incomplete…"), then, after capture, must MATCH it before moving to the next step. Records nothing; `submit()` still re-verifies. Returns yes/no only and throttles repeated failures.
+* Registration / enrol pages compare each capture with the earlier ones on the phone (`AT.face.assertSamePerson`), and require the whole face to be centred inside the frame.
+* Lecturer "Use my current location": keeps the best fix over 15 s, accepts up to ±250 m with an honest warning (was refused above ±100 m).
+
 # Browser face matching + enforcement (Nov 2026)
 
 * **New** `backend/src/Services/FaceBrowserProvider.php`, provider `browser` (see `docs/FACE_BROWSER.md`); `FaceService`/interface accept it (`enroll(..., array $extra = [])`).
