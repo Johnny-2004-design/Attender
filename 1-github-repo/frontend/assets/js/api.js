@@ -188,6 +188,9 @@
     submitRegistration: function (p) {
       return AT.ensureCsrf().then(function () { return req('registration', { method: 'POST', body: p }); });
     },
+    enrolFace: function (p) {
+      return AT.ensureCsrf().then(function () { return req('registration/face', { method: 'POST', body: p }); });
+    },
     resolveAttendanceInput: function (input) {
       return AT.ensureCsrf().then(function () {
         return req('attendance/resolve', { method: 'POST', body: { input: input } });

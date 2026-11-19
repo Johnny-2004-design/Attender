@@ -63,7 +63,7 @@
 
 <script src="../assets/vendor/bootstrap/bootstrap.bundle.min.js"></script>
 <script src="../assets/vendor/jsqr/jsQR.js"></script>
-<script src="../assets/js/config.js"></script><script src="../assets/js/api.js"></script><script src="../assets/js/core.js"></script><script src="../assets/js/student.js"></script>
+<script src="../assets/js/config.js"></script><script src="../assets/js/api.js?v=20261118"></script><script src="../assets/js/core.js"></script><script src="../assets/js/student.js"></script><script src="../assets/js/face.js?v=20261118"></script>
 <script>
   const S = AT.student; let sStream, stopScan, input = '';
   const view = function (id) { ['v-entry', 'v-verify', 'v-result'].forEach(function (v) { AT.$('#' + v).classList.toggle('d-none', v !== id); }); window.scrollTo(0, 0); };
@@ -102,18 +102,26 @@
     let pos = {};
     if (s.gps) { row('r-gps', 'running', 'Getting your location…'); stepBar(1);
       try { pos = await S.getPosition(); } catch (e) { row('r-gps', 'fail', e.message); return fail(e.message); }
+      if (s.minAccuracy && pos.accuracy > s.minAccuracy) {
+        const m = 'Your device only knows your location to ±' + Math.round(pos.accuracy) + ' m (limit ±' + s.minAccuracy + ' m). A laptop or a phone with GPS off does this. Open this page on your phone, switch Location/GPS on, stand near a window, and try again.';
+        row('r-gps', 'fail', 'Too imprecise (±' + Math.round(pos.accuracy) + ' m)'); return fail(m);
+      }
       row('r-gps', 'ok', 'Location captured (±' + Math.round(pos.accuracy) + ' m)'); } else { row('r-gps', 'ok', 'Not required for this session'); }
     // 3. face + liveness
-    let frames = [];
+    let frames = [], descriptors = [], passed = null;
     let challenge = null;
     if (s.face) { stepBar(2); row('r-face', 'running', 'Starting camera…');
-      try { const live = await liveness(); frames = live.frames; challenge = live.challenge; } catch (e) { row('r-face', 'fail', S.cameraError(e)); return fail(S.cameraError(e)); }
-      row('r-face', 'ok', 'Images captured and sent for verification'); } else { row('r-face', 'ok', 'Not required for this session'); }
+      try {
+        if (s.faceMode === 'browser') { const live = await browserLiveness(); descriptors = live.descriptors; challenge = live.challenge; passed = live.passed;
+          if (!passed) { const m = 'We did not see you follow the instruction (' + AT.face.CHALLENGES[challenge].toLowerCase() + '). Try again and do it clearly, facing the camera in good light.'; row('r-face', 'fail', 'Instruction not completed'); return fail(m); } }
+        else { const live = await liveness(); frames = live.frames; challenge = live.challenge; }
+      } catch (e) { row('r-face', 'fail', S.cameraError(e)); return fail(S.cameraError(e)); }
+      row('r-face', 'ok', 'Face captured and sent for verification'); } else { row('r-face', 'ok', 'Not required for this session'); }
     // 4. server verification engine
     stepBar(3); row('r-fin', 'running', 'Recording…'); await sleep(200);
     const r = await AT.api.submitAttendance({
       input: input, index: idx, lat: pos.lat, lng: pos.lng, accuracy: pos.accuracy,
-      faceImages: frames, livenessChallenge: challenge, livenessFrames: frames.slice(1)
+      faceImages: frames, faceDescriptors: descriptors, livenessChallenge: challenge, livenessPassed: passed, livenessFrames: frames.slice(1)
     });
     if (!r.ok) {
       row('r-fin', 'fail', r.reason || 'Not recorded');
@@ -135,6 +143,17 @@
     p.textContent = 'Hold still…'; await sleep(400); S.stopCamera(st); AT.$('#facebox').classList.add('d-none'); return { frames: frames, challenge: c[1] };
   }
 
+  // In-browser face engine: loads models, opens the camera, 2 frontal captures + a random action + 1 more. Only numbers leave the phone.
+  async function browserLiveness() {
+    AT.$('#facebox').classList.remove('d-none'); const v = AT.$('#fv'), oval = AT.$('#oval'), p = AT.$('#fp');
+    p.textContent = 'Loading face check…'; row('r-face', 'running', 'Loading face check…');
+    await AT.face.load(function (t) { p.textContent = t; row('r-face', 'running', t); });
+    const st = await S.startCamera(v, 'user');
+    try { row('r-face', 'running', 'Look at the camera and follow the instruction');
+      return await AT.face.verifyCapture(v, { prompt: function (t) { p.textContent = t; }, good: function (g) { oval.classList.toggle('good', g); } });
+    } finally { S.stopCamera(st); AT.$('#facebox').classList.add('d-none'); }
+  }
+
   function offlineQueue(idx) { row('r-sess', 'ok', 'Saved on this phone'); const n = S.enqueue({ input: input, index: idx }); stepBar(3);
     result({ ok: true, queued: true, count: n }); }
   async function flush() {
@@ -150,7 +169,8 @@
     if (r.queued) { ic.className = 'result-icon wait'; i.className = 'bi bi-cloud-arrow-up'; AT.$('#rt').textContent = 'Saved — waiting for connection'; AT.$('#rm').textContent = 'Your check-in is PENDING on this phone. It only counts after the server verifies location and face — never from offline alone.'; return; }
     if (r.ok && r.pending) { ic.className = 'result-icon wait'; i.className = 'bi bi-hourglass-split'; AT.$('#rt').textContent = 'Received — pending review'; AT.$('#rm').textContent = 'The server saved a PENDING record (not Present). Face verification was incomplete or the face service was unavailable.'; }
     else if (r.ok) { ic.className = 'result-icon ok'; i.className = 'bi bi-check-lg'; AT.$('#rt').textContent = 'Attendance Recorded Successfully.'; AT.$('#rm').textContent = r.status === 'late' ? 'The server marked you late.' : 'The server marked you present.'; }
-    else { ic.className = 'result-icon fail'; i.className = 'bi bi-x-lg'; AT.$('#rt').textContent = 'Attendance Not Recorded.'; AT.$('#rm').textContent = r.reason || 'The server rejected this check-in.'; }
+    else { ic.className = 'result-icon fail'; i.className = 'bi bi-x-lg'; AT.$('#rt').textContent = 'Attendance Not Recorded.'; AT.$('#rm').textContent = r.reason || 'The server rejected this check-in.';
+      if (/enrol/i.test(r.reason || '')) { const a = document.createElement('a'); a.href = 'face.html'; a.className = 'd-block mt-2 fw-600'; a.textContent = 'Enrol my face now'; AT.$('#rm').appendChild(a); } }
     if (r.ok && r.course) { d.classList.remove('d-none'); d.innerHTML = '<div class="d-flex justify-content-between py-1"><span class="text-muted">Course</span><b>' + AT.esc(r.course.code) + '</b></div><div class="d-flex justify-content-between py-1"><span class="text-muted">Name</span><b>' + AT.esc(r.name) + '</b></div><div class="d-flex justify-content-between py-1"><span class="text-muted">Time</span><b>' + AT.fmtTime(new Date().toISOString()) + '</b></div>'; }
   }
   AT.$('#again').onclick = function () { location.href = 'scan.html'; };

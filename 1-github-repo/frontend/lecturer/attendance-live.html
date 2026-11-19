@@ -39,8 +39,8 @@
         <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" id="s-gps" checked><label class="form-check-label fw-600" for="s-gps">GPS location check</label></div>
         <div id="gps-box">
           <label class="form-label">Radius: <b id="rv">30 m</b></label>
-          <div class="d-flex gap-2 mb-2"><button type="button" class="btn btn-sm btn-ghost" data-r="20">20 m</button><button type="button" class="btn btn-sm btn-ghost" data-r="30">30 m</button><button type="button" class="btn btn-sm btn-ghost" data-r="50">50 m</button></div>
-          <input type="range" class="form-range" id="s-rad" min="10" max="200" step="5" value="30">
+          <div class="d-flex gap-2 mb-2"><button type="button" class="btn btn-sm btn-ghost" data-r="20">20 m</button><button type="button" class="btn btn-sm btn-ghost" data-r="30">30 m</button><button type="button" class="btn btn-sm btn-ghost" data-r="50">50 m</button><button type="button" class="btn btn-sm btn-ghost" data-r="100">100 m</button></div>
+          <input type="range" class="form-range" id="s-rad" min="10" max="500" step="5" value="30">
           <div class="map-preview my-3"><div class="map-radius" id="mr"></div><div class="map-pin"><i class="bi bi-geo-alt-fill"></i></div></div>
           <div class="d-flex align-items-center gap-2"><button type="button" class="btn btn-soft btn-sm" id="locate"><i class="bi bi-crosshair me-1"></i>Use my location</button><span class="small text-muted" id="lstat">Not set</span></div>
         </div>
@@ -128,13 +128,16 @@ function sync() { const o = AT.$('#s-course').selectedOptions[0]; AT.$('#s-elig'
 AT.$('#s-qrmode').addEventListener('change', function () { AT.$('#s-qrmin').value = this.value === 'live' ? 30 : 5; sync(); });
 document.querySelectorAll('[data-r]').forEach(function (b) { b.onclick = function () { AT.$('#s-rad').value = b.dataset.r; sync(); }; });
 AT.$('#locate').onclick = function () { if (!navigator.geolocation) return AT.toast('This browser has no location support.', 'error'); AT.$('#lstat').textContent = 'Locating…';
-  navigator.geolocation.getCurrentPosition(function (p) { S.lat = p.coords.latitude; S.lng = p.coords.longitude; S.acc = p.coords.accuracy; AT.api.saveSettings({ lat: S.lat, lng: S.lng }); AT.$('#lstat').textContent = S.lat.toFixed(5) + ', ' + S.lng.toFixed(5) + ' (±' + Math.round(p.coords.accuracy) + ' m)'; AT.toast('Classroom location saved'); },
+  navigator.geolocation.getCurrentPosition(function (p) { const acc = Math.round(p.coords.accuracy);
+    if (acc > 100) { AT.$('#lstat').textContent = S.lat ? S.lat.toFixed(5) + ', ' + S.lng.toFixed(5) : 'Not set'; return AT.toast('That reading is only accurate to ±' + acc + ' m, so it was NOT saved. Laptops guess from Wi-Fi/IP — use your phone, or paste coordinates in Settings.', 'error'); }
+    S.lat = p.coords.latitude; S.lng = p.coords.longitude; S.acc = p.coords.accuracy; AT.api.saveSettings({ lat: S.lat, lng: S.lng }); AT.$('#lstat').textContent = S.lat.toFixed(5) + ', ' + S.lng.toFixed(5) + ' (±' + acc + ' m)'; AT.toast('Classroom location saved'); },
     function (e) { AT.$('#lstat').textContent = 'Unavailable'; AT.toast(e.code === 1 ? 'Location permission denied. Allow it in your browser settings.' : 'Could not get your location.', 'error'); }, { enableHighAccuracy: true, timeout: 15000 }); };
 AT.$('#sf').onsubmit = function (e) { e.preventDefault(); const gps = AT.$('#s-gps').checked;
   if (gps && !S.lat) return AT.toast('Set the classroom location first (Use my location).', 'error');
   const method = document.querySelector('[name=method]:checked').value, qrMode = AT.$('#s-qrmode').value;
   AT.api.openSession({ courseId: AT.$('#s-course').value, method: method, radius: AT.$('#s-rad').value, duration: AT.$('#s-dur').value, lateAfter: AT.$('#s-late').value, qrMode: qrMode, qrMinutes: AT.$('#s-qrmin').value, gps: gps, face: AT.$('#s-face').checked, location: AT.$('#s-loc').value.trim() || 'Classroom' })
-    .then(function (a) { AT.api.saveSettings({ locName: a.location }); A = a; AT.toast('Attendance is open'); startLive(); }); };
+    .then(function (a) { AT.api.saveSettings({ locName: a.location }); A = a; AT.toast('Attendance is open'); startLive(); })
+    .catch(function (e) { AT.toast('Could not open attendance: ' + (e && e.message || 'server error'), 'error'); }); };
 
 /* ---------- Live ---------- */
 function startLive() { show('live'); const c = AT.api; Promise.all([c.courses(), c.classes()]).then(function (r) { const co = r[0].find(function (x) { return x.id === A.courseId; }); AT.$('#l-course').textContent = co.code + ' — ' + co.title; AT.$('#l-class').textContent = co.class.name + ' · ' + A.location; });

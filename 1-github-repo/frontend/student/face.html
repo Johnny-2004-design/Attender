@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0A66C2">
+  <meta name="csrf-token" content="">
+  <title>Enrol my face — ATTENDER</title>
+  <link rel="icon" href="../assets/img/logo.svg">
+  <link rel="stylesheet" href="../assets/vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="../assets/vendor/icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../assets/css/attender.css">
+</head>
+<body class="student-body">
+<div class="student-wrap">
+  <div class="student-top"><a href="scan.html" class="brand text-decoration-none"><img src="../assets/img/logo.svg" alt="">ATTENDER</a><a href="scan.html" class="small fw-600">Back to attendance</a></div>
+
+  <section id="s1">
+    <h1 class="step-title">Enrol my face</h1>
+    <p class="text-muted">For students who are already registered but whose face is not on file yet. Takes about a minute.</p>
+    <form id="f" class="at-card at-card-body" novalidate>
+      <div class="mb-3"><label class="form-label" for="idx">Student ID / index number</label><input class="form-control form-control-lg mono" id="idx" autocapitalize="characters" required></div>
+      <div class="mb-3"><label class="form-label" for="phone">Phone number you registered with</label><input class="form-control" id="phone" type="tel" autocomplete="tel" required><div class="form-text">Used only to confirm it is you.</div></div>
+      <div class="at-card-body small bg-light rounded-3 mb-3"><b class="d-block mb-1"><i class="bi bi-shield-lock me-1 text-primary"></i>How your face data is used</b>Your phone turns your face into a list of numbers; only those numbers are sent, never a photo. They are used only to verify your attendance, and are deleted on request or by your lecturer's retention policy.
+        <div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="agree"><label class="form-check-label" for="agree">I understand and consent.</label></div></div>
+      <div class="alert alert-danger py-2 d-none" id="e1"></div>
+      <button class="btn btn-primary btn-lg w-100" type="submit" id="go" disabled><i class="bi bi-camera-video me-2"></i>Start camera</button>
+    </form>
+  </section>
+
+  <section id="s2" class="d-none">
+    <h1 class="step-title">Look at the camera</h1>
+    <div class="face-box mb-3"><video id="v" autoplay playsinline muted></video><div class="face-oval" id="oval"></div><div class="face-prompt" id="prompt"></div></div>
+    <div class="d-flex gap-2 mb-3" id="shots"></div>
+    <div class="alert alert-danger py-2 d-none" id="e2"></div>
+    <button class="btn btn-primary btn-lg w-100" id="cap" type="button">Capture (1 of 3)</button>
+  </section>
+
+  <section id="s3" class="d-none text-center pt-3">
+    <div class="result-icon ok"><i class="bi bi-person-check"></i></div><h2>Face enrolled</h2><p class="text-muted" id="done-t"></p>
+    <a href="scan.html" class="btn btn-primary btn-lg w-100">Go to attendance</a>
+  </section>
+</div>
+
+<script src="../assets/vendor/bootstrap/bootstrap.bundle.min.js"></script>
+<script src="../assets/js/config.js"></script><script src="../assets/js/api.js?v=20261118"></script><script src="../assets/js/core.js"></script><script src="../assets/js/student.js"></script><script src="../assets/js/face.js?v=20261118"></script>
+<script>
+  const S = AT.student; let stream, descs = [], shots = [];
+  const show = function (id) { ['s1', 's2', 's3'].forEach(function (x) { AT.$('#' + x).classList.toggle('d-none', x !== id); }); window.scrollTo(0, 0); };
+  const prompts = ['Look straight at the camera', 'Look straight, relaxed face', 'Look straight and smile slightly'];
+  const saved = S.recall('index'); if (saved) AT.$('#idx').value = saved;
+  AT.$('#idx').oninput = function () { this.value = this.value.toUpperCase(); };
+  AT.$('#agree').onchange = function () { AT.$('#go').disabled = !this.checked; };
+  const e1 = function (m) { const e = AT.$('#e1'); e.textContent = m; e.classList.toggle('d-none', !m); };
+
+  AT.$('#f').onsubmit = function (ev) { ev.preventDefault(); const b = AT.$('#go');
+    if (AT.$('#idx').value.trim().length < 5) return e1('Enter your index number.'); if (AT.$('#phone').value.replace(/\D/g, '').length < 9) return e1('Enter the phone number you registered with.'); e1('');
+    if (!S.secureOk()) return e1(S.secureMessage);
+    b.disabled = true; b.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Starting…';
+    S.startCamera(AT.$('#v'), 'user').then(function (st) { stream = st; show('s2'); AT.$('#prompt').textContent = 'Loading face check…'; AT.$('#cap').disabled = true; return AT.face.load(function (t) { AT.$('#prompt').textContent = t; }); })
+      .then(function () { AT.$('#cap').disabled = false; AT.$('#prompt').textContent = prompts[0]; AT.$('#oval').classList.add('good'); })
+      .catch(function (e) { S.stopCamera(stream); stream = null; show('s1'); b.disabled = false; b.innerHTML = '<i class="bi bi-camera-video me-2"></i>Start camera'; e1(S.cameraError(e)); }); };
+
+  AT.$('#cap').onclick = function () { const b = this, err = AT.$('#e2'); err.classList.add('d-none'); b.disabled = true; b.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Checking…';
+    AT.face.describe(AT.$('#v'), { prompt: function (t) { AT.$('#prompt').textContent = t; }, good: function (g) { AT.$('#oval').classList.toggle('good', g); } }).then(function (r) {
+      descs.push(r.descriptor); shots.push(S.snapshot(AT.$('#v'), 160));
+      AT.$('#shots').innerHTML = shots.map(function (s) { return '<img src="' + s + '" class="rounded-3" style="width:30%;aspect-ratio:3/4;object-fit:cover;transform:scaleX(-1)" alt="">'; }).join('');
+      if (descs.length < 3) { b.disabled = false; b.textContent = 'Capture (' + (descs.length + 1) + ' of 3)'; AT.$('#prompt').textContent = prompts[descs.length]; return; }
+      b.textContent = 'Saving…'; S.stopCamera(stream);
+      return AT.api.enrolFace({ index: AT.$('#idx').value.trim().toUpperCase(), phone: AT.$('#phone').value.trim(), faceDescriptors: descs.slice() }).then(function (res) {
+        S.remember('index', AT.$('#idx').value.trim().toUpperCase()); AT.$('#done-t').textContent = (res.name || 'You') + ', you can now mark attendance with face verification.'; show('s3');
+      });
+    }).catch(function (e) { const msg = (e && e.data && (e.data.error || e.data.reason)) || (e && e.message) || 'Something went wrong.';
+      if (descs.length >= 3 || /match a registration|already on file|Too many|not registered|did not look like/i.test(msg)) { S.stopCamera(stream); stream = null; descs = []; shots = []; AT.$('#shots').innerHTML = ''; show('s1'); AT.$('#go').disabled = false; AT.$('#go').innerHTML = '<i class="bi bi-camera-video me-2"></i>Start camera'; e1(msg); return; }
+      b.disabled = false; b.textContent = 'Capture (' + (descs.length + 1) + ' of 3)'; err.textContent = msg; err.classList.remove('d-none'); }); };
+</script>
+</body>
+</html>

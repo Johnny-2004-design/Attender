@@ -17,9 +17,11 @@
     <div class="at-card mb-3"><div class="at-card-header"><h5>Location (GPS)</h5></div><div class="at-card-body">
       <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" id="gps"><label class="form-check-label fw-600" for="gps">Require GPS verification by default</label></div>
       <div class="row g-3">
-        <div class="col-md-6"><label class="form-label">Default radius (m)</label><input type="number" min="10" max="500" class="form-control" id="rad"></div>
-        <div class="col-md-6"><label class="form-label">Flag readings less accurate than (m)</label><input type="number" min="10" max="500" class="form-control" id="acc"><div class="form-text">Low-confidence readings go to review instead of being rejected.</div></div>
-        <div class="col-12"><label class="form-label">Saved classroom location</label><input class="form-control mb-2" id="loc" placeholder="Name, e.g. Lecture Hall A"><div class="d-flex gap-2 align-items-center"><button class="btn btn-soft btn-sm" id="here" type="button"><i class="bi bi-crosshair me-1"></i>Use my current location</button><span class="small text-muted" id="coords"></span></div></div>
+        <div class="col-md-6"><label class="form-label">Default radius (m)</label><input type="number" min="10" max="500" class="form-control" id="rad"><div class="form-text">10–500 m. 30–50 m suits one classroom.</div></div>
+        <div class="col-md-6"><label class="form-label">Reject readings less accurate than (m)</label><input type="number" min="10" max="500" class="form-control" id="acc"><div class="form-text">A student whose phone reports a worse accuracy than this is rejected with a clear message. 10–500 m; about 50 m works for a phone with GPS on.</div></div>
+        <div class="col-12"><label class="form-label">Saved classroom location</label><input class="form-control mb-2" id="loc" placeholder="Name, e.g. Lecture Hall A"><div class="d-flex gap-2 align-items-center"><button class="btn btn-soft btn-sm" id="here" type="button"><i class="bi bi-crosshair me-1"></i>Use my current location</button><span class="small text-muted" id="coords"></span></div>
+          <div class="input-group input-group-sm mt-2"><input class="form-control" id="paste" placeholder="Or paste coordinates from Google Maps, e.g. 5.11958, -1.30029"><button class="btn btn-soft" id="pasteBtn" type="button">Use these</button></div>
+          <div class="form-text">Tip: on your phone, stand in the room and tap “Use my current location”. A laptop only gives a rough guess.</div></div>
       </div></div></div>
     <div class="at-card"><div class="at-card-header"><h5>Attendance codes and QR</h5></div><div class="at-card-body"><div class="row g-3">
       <div class="col-md-6"><label class="form-label">Live QR refresh (seconds)</label><input type="number" min="10" max="120" class="form-control" id="rot"></div>
@@ -52,10 +54,34 @@ let S;
 function put() { AT.$('#gps').checked = S.requireGps !== false; AT.$('#rad').value = S.defaultRadius; AT.$('#acc').value = S.minAccuracy; AT.$('#loc').value = S.locName || ''; AT.$('#coords').textContent = S.lat ? S.lat.toFixed(5) + ', ' + S.lng.toFixed(5) : 'Not set'; AT.$('#rot').value = S.qrRotateSeconds; AT.$('#att').value = S.maxCodeAttempts; AT.$('#th').value = S.faceThreshold; AT.$('#thv').textContent = Math.round(S.faceThreshold * 100) + '%'; AT.$('#allow').checked = !!S.allowDisableFace; AT.$('#ret').value = S.retention || '12'; }
 AT.api.settings().then(function (s) { S = s; put(); });
 AT.$('#th').oninput = function () { AT.$('#thv').textContent = Math.round(this.value * 100) + '%'; };
-AT.$('#here').onclick = function () { navigator.geolocation ? navigator.geolocation.getCurrentPosition(function (p) { S.lat = p.coords.latitude; S.lng = p.coords.longitude; AT.$('#coords').textContent = S.lat.toFixed(5) + ', ' + S.lng.toFixed(5) + ' (±' + Math.round(p.coords.accuracy) + ' m)'; }, function () { AT.toast('Location permission was denied or unavailable.', 'error'); }, { enableHighAccuracy: true, timeout: 15000 }) : AT.toast('No location support in this browser.', 'error'); };
-AT.$('#save').onclick = function () { const n = function (i) { return Number(AT.$('#' + i).value); };
-  if (n('rad') < 10 || n('rot') < 10 || n('att') < 1) return AT.toast('Please check the highlighted values.', 'error');
-  AT.api.saveSettings({ requireGps: AT.$('#gps').checked, defaultRadius: n('rad'), minAccuracy: n('acc'), locName: AT.$('#loc').value.trim(), lat: S.lat, lng: S.lng, qrRotateSeconds: n('rot'), maxCodeAttempts: n('att'), faceThreshold: n('th'), allowDisableFace: AT.$('#allow').checked, retention: AT.$('#ret').value }).then(function () { AT.toast('Settings saved'); }); };
+function showCoords() { AT.$('#coords').textContent = S && S.lat ? S.lat.toFixed(5) + ', ' + S.lng.toFixed(5) : 'Not set'; }
+AT.$('#here').onclick = function () {
+  if (!navigator.geolocation) return AT.toast('No location support in this browser.', 'error');
+  AT.$('#coords').textContent = 'Locating…';
+  navigator.geolocation.getCurrentPosition(function (p) {
+    const acc = Math.round(p.coords.accuracy);
+    if (acc > 100) { showCoords(); return AT.toast('That reading is only accurate to ±' + acc + ' m (laptops guess from Wi-Fi/IP). It was NOT saved. Use your phone, or paste coordinates from Google Maps.', 'error'); }
+    S.lat = p.coords.latitude; S.lng = p.coords.longitude;
+    AT.$('#coords').textContent = S.lat.toFixed(5) + ', ' + S.lng.toFixed(5) + ' (±' + acc + ' m) — press Save settings';
+  }, function () { showCoords(); AT.toast('Location permission was denied or unavailable.', 'error'); }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+};
+AT.$('#pasteBtn').onclick = function () {
+  const m = AT.$('#paste').value.match(/(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)/);
+  if (!m || Math.abs(+m[1]) > 90 || Math.abs(+m[2]) > 180) return AT.toast('Paste two numbers like 5.11958, -1.30029', 'error');
+  S.lat = +m[1]; S.lng = +m[2]; AT.$('#coords').textContent = S.lat.toFixed(5) + ', ' + S.lng.toFixed(5) + ' — press Save settings';
+};
+AT.$('#save').onclick = function () {
+  const n = function (i) { return Number(AT.$('#' + i).value); };
+  const bad = [];
+  if (!(n('rad') >= 10 && n('rad') <= 500)) bad.push('Default radius must be 10–500 m');
+  if (!(n('acc') >= 10 && n('acc') <= 500)) bad.push('Accuracy limit must be 10–500 m');
+  if (!(n('rot') >= 10 && n('rot') <= 120)) bad.push('QR refresh must be 10–120 seconds');
+  if (!(n('att') >= 1 && n('att') <= 10)) bad.push('Max code attempts must be 1–10');
+  if (bad.length) return AT.toast(bad[0], 'error');
+  AT.api.saveSettings({ requireGps: AT.$('#gps').checked, defaultRadius: n('rad'), minAccuracy: n('acc'), locName: AT.$('#loc').value.trim(), lat: S.lat, lng: S.lng, qrRotateSeconds: n('rot'), maxCodeAttempts: n('att'), faceThreshold: n('th'), allowDisableFace: AT.$('#allow').checked, retention: AT.$('#ret').value })
+    .then(function (saved) { S = saved; put(); AT.toast('Settings saved. They apply to the next session you open.'); })
+    .catch(function (e) { AT.toast('Settings were NOT saved: ' + (e && e.message || 'server error'), 'error'); });
+};
 AT.$('#reset').onclick = function () {
   AT.confirm({ title: 'Reset sample data?', text: 'Re-run php database/seed.php on the server to restore the demo dataset. This button does not wipe the live database from the browser.', danger: true, ok: 'Got it' }).then(function () {
     AT.toast('On the server: php database/seed.php', 'info');

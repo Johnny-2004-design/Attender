@@ -60,12 +60,12 @@
   </section>
 
   <section id="s-exist" class="d-none text-center pt-3">
-    <div class="result-icon ok"><i class="bi bi-person-check"></i></div><h2>You are already registered</h2><p class="text-muted" id="ex-t"></p><a href="scan.html" class="btn btn-primary btn-lg w-100">Go to attendance</a>
+    <div class="result-icon ok"><i class="bi bi-person-check"></i></div><h2>You are already registered</h2><p class="text-muted" id="ex-t"></p><a href="face.html" class="btn btn-ghost w-100 mb-2 d-none" id="ex-face">My face is not enrolled yet</a><a href="scan.html" class="btn btn-primary btn-lg w-100">Go to attendance</a>
   </section>
 </div>
 
 <script src="../assets/vendor/bootstrap/bootstrap.bundle.min.js"></script>
-<script src="../assets/js/config.js"></script><script src="../assets/js/api.js"></script><script src="../assets/js/core.js"></script><script src="../assets/js/student.js"></script>
+<script src="../assets/js/config.js"></script><script src="../assets/js/api.js?v=20261118"></script><script src="../assets/js/core.js"></script><script src="../assets/js/student.js"></script><script src="../assets/js/face.js?v=20261118"></script>
 <script>
   const token = new URLSearchParams(location.search).get('invite') || ''; let info, form, stream, shots = [];
   const steps = ['s1', 's2', 's3']; function go(n) { steps.concat(['s-exist']).forEach(function (s) { AT.$('#' + s).classList.add('d-none'); }); AT.$('#' + (n === 'exist' ? 's-exist' : steps[n])).classList.remove('d-none'); AT.$$('#stp > div').forEach(function (e, i) { e.className = i < n ? 'done' : i === n ? 'now' : ''; }); window.scrollTo(0, 0); }
@@ -79,35 +79,42 @@
   AT.$('#back').onclick = function () { S.stopCamera(stream); go(0); };
   AT.$('#agree').onchange = function () { AT.$('#cam').disabled = !this.checked; };
 
-  const prompts = ['Look straight at the camera', 'Slowly turn your head to the left', 'Slowly turn your head to the right']; const S = AT.student;
-  AT.$('#cam').onclick = function () { const btn = this, err = AT.$('#e2'); err.classList.add('d-none');
-    if (!stream) { btn.disabled = true; S.startCamera(AT.$('#v'), 'user').then(function (st) { stream = st; AT.$('#camwrap').classList.remove('d-none'); AT.$('#consent').classList.add('d-none'); btn.disabled = false; btn.innerHTML = '<i class="bi bi-camera me-2"></i>Capture (1 of 3)'; AT.$('#prompt').textContent = prompts[0]; AT.$('#oval').classList.add('good'); })
-      .catch(function (e) { btn.disabled = false; err.textContent = S.cameraError(e); err.classList.remove('d-none'); }); return; }
-    shots.push(S.snapshot(AT.$('#v'), 480)); AT.$('#shots').innerHTML = shots.map(function (s) { return '<img src="' + s + '" class="rounded-3" style="width:30%;aspect-ratio:3/4;object-fit:cover;transform:scaleX(-1)" alt="">'; }).join('');
-    if (shots.length < 3) { btn.innerHTML = '<i class="bi bi-camera me-2"></i>Capture (' + (shots.length + 1) + ' of 3)'; AT.$('#prompt').textContent = prompts[shots.length]; return; }
-    btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Submitting…'; S.stopCamera(stream);
-    // Captured images are posted to the server. Templates are stored under storage/templates (outside public URLs when configured).
-    const payload = Object.assign({}, form, { faceImages: shots.slice() });
+  const prompts = ['Look straight at the camera', 'Look straight, relaxed face', 'Look straight and smile slightly']; const S = AT.student;
+  const browserFace = function () { return info && info.faceMode === 'browser'; }; let descs = [];
+  function sendRegistration(btn) {
+    btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Submitting…'; S.stopCamera(stream); stream = null;
+    // browser face mode: only 3 numeric face descriptors are sent, never photos.
+    const payload = Object.assign({}, form, browserFace() ? { faceDescriptors: descs.slice() } : { faceImages: shots.slice() });
     AT.api.submitRegistration(payload).then(function (r) {
-      if (r.existing) { AT.$('#ex-t').textContent = r.name + ' is already registered for this class (' + r.status + ').'; go('exist'); return; }
-      if (!r.ok || r.retry_face) {
-        btn.disabled = false; btn.innerHTML = '<i class="bi bi-camera me-2"></i>Retake & submit';
-        shots = []; AT.$('#shots').innerHTML = '';
-        AT.$('#e2').textContent = r.reason || 'Face enrollment failed. Retake the three photos and try again.';
-        AT.$('#e2').classList.remove('d-none');
-        return;
-      }
+      if (r.existing) { AT.$('#ex-t').textContent = r.name + ' is already registered for this class (' + r.status + ').'; AT.$('#ex-face').classList.remove('d-none'); go('exist'); return; }
+      if (!r.ok || r.retry_face) { return retake(btn, r.reason || 'Face enrollment failed. Retake the three photos and try again.'); }
       if (r.face_enrolled === false) {
-        AT.$('#e2').textContent = (r.face_reason || 'Your registration was saved, but face enrollment is incomplete.') + ' Ask your lecturer to confirm the face service is running, then re-enrol.';
+        AT.$('#e2').textContent = (r.face_reason || 'Your registration was saved, but face enrollment is incomplete.') + ' You can finish it later at the face enrolment page.';
         AT.$('#e2').classList.remove('d-none');
       }
       AT.$('#r-n').textContent = form.name; AT.$('#r-i').textContent = form.index; S.remember('index', form.index); go(2);
-    }).catch(function (ex) {
-      btn.disabled = false; btn.innerHTML = '<i class="bi bi-camera me-2"></i>Try again';
-      shots = []; AT.$('#shots').innerHTML = '';
-      const msg = (ex && ex.data && (ex.data.reason || ex.data.error)) || (ex && ex.message) || 'Registration failed.';
-      AT.$('#e2').textContent = msg; AT.$('#e2').classList.remove('d-none');
-    }); };
+    }).catch(function (ex) { retake(btn, (ex && ex.data && (ex.data.reason || ex.data.error)) || (ex && ex.message) || 'Registration failed.'); });
+  }
+  function retake(btn, msg) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-camera me-2"></i>Retake'; shots = []; descs = []; AT.$('#shots').innerHTML = ''; AT.$('#oval').classList.remove('good'); AT.$('#prompt').textContent = prompts[0];
+    if (!stream) { btn.innerHTML = '<i class="bi bi-camera-video me-2"></i>Start camera'; } else { btn.innerHTML = '<i class="bi bi-camera me-2"></i>Capture (1 of 3)'; }
+    AT.$('#e2').textContent = msg; AT.$('#e2').classList.remove('d-none'); }
+  AT.$('#cam').onclick = function () { const btn = this, err = AT.$('#e2'); err.classList.add('d-none');
+    if (!stream) { btn.disabled = true;
+      S.startCamera(AT.$('#v'), 'user').then(function (st) { stream = st; AT.$('#camwrap').classList.remove('d-none'); AT.$('#consent').classList.add('d-none');
+          AT.$('#prompt').textContent = browserFace() ? 'Loading face check…' : prompts[0];
+          return browserFace() ? AT.face.load(function (t) { AT.$('#prompt').textContent = t; }) : null; })
+        .then(function () { btn.disabled = false; btn.innerHTML = '<i class="bi bi-camera me-2"></i>Capture (1 of 3)'; AT.$('#prompt').textContent = prompts[0]; AT.$('#oval').classList.add('good'); })
+        .catch(function (e) { btn.disabled = false; S.stopCamera(stream); stream = null; AT.$('#camwrap').classList.add('d-none'); AT.$('#consent').classList.remove('d-none'); err.textContent = S.cameraError(e); err.classList.remove('d-none'); }); return; }
+    const done = function () {
+      AT.$('#shots').innerHTML = shots.map(function (s) { return '<img src="' + s + '" class="rounded-3" style="width:30%;aspect-ratio:3/4;object-fit:cover;transform:scaleX(-1)" alt="">'; }).join('');
+      if (shots.length < 3) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-camera me-2"></i>Capture (' + (shots.length + 1) + ' of 3)'; AT.$('#prompt').textContent = prompts[shots.length]; return; }
+      sendRegistration(btn); };
+    if (browserFace()) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Checking…';
+      AT.face.describe(AT.$('#v'), { prompt: function (t) { AT.$('#prompt').textContent = t; }, good: function (g) { AT.$('#oval').classList.toggle('good', g); } })
+        .then(function (r) { descs.push(r.descriptor); shots.push(S.snapshot(AT.$('#v'), 160)); done(); })   // thumbnail stays on this phone
+        .catch(function (e) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-camera me-2"></i>Capture (' + (shots.length + 1) + ' of 3)'; err.textContent = e.message; err.classList.remove('d-none'); });
+      return; }
+    shots.push(S.snapshot(AT.$('#v'), 480)); done(); };
 </script>
 </body>
 </html>
